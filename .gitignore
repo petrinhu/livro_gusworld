@@ -1,0 +1,8 @@
+/.insumos/
+/saida/
+/.claude/*
+!/.claude/settings.json
+.directory
+*~
+*.swp
+.~lock.*#

@@ -57,7 +57,7 @@ novo_repo() { # NOME: repositorio descartavel com semente, git-crypt e copia dos
     git config --local user.email "$NOREPLY" || return 1
     mkdir -p ferramentas/portoes || return 1
     find "$FONTE" -maxdepth 1 -type f -exec cp -t ferramentas/portoes {} + || return 1
-    printf 'semente\n' > semente.md || return 1
+    printf 'Semente do teste de cifra, texto generico sem travessao.\n' > semente.md || return 1
     git add .gitattributes .gitignore .github/workflows/sigilo.yml ferramentas/portoes semente.md || return 1
     t=$(git write-tree) || return 1
     c=$(git commit-tree "$t" -m "chore: semente do teste (SG-02)") || return 1

@@ -1,4 +1,5 @@
 """Portao de travessao (SG-02): proibido em todo arquivo decifrado, salvo abrindo fala nos textos."""
+from portao_cifra import e_binario, falha_teto
 from portao_git import conteudos_filtrados
 from portao_regras import CABECALHO, FALA, TRAVESSOES
 
@@ -29,7 +30,15 @@ def portao_travessao(itens):
     corpos = conteudos_filtrados(alvo)
     for (_sha, caminho), corpo in zip(alvo, corpos):
         if corpo.startswith(CABECALHO):
-            falhas.append(f"ainda cifrado apos o filtro (chave ausente ou filtro inativo): {caminho}")
+            falhas.append("conteudo decifrado ainda comeca com o cabecalho (arquivo de trabalho ja era "
+                          f"cifrado): {caminho}")
+            continue
+        if e_binario(caminho):
+            falha = falha_teto(caminho, len(corpo))
+            if falha:
+                falhas.append(falha)
+            else:
+                analisados += 1
             continue
         try:
             texto = corpo.decode("utf-8")

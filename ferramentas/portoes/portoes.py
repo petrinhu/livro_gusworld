@@ -25,7 +25,8 @@ import sys
 sys.dont_write_bytecode = True  # sem __pycache__ na arvore (os modulos sao importados)
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))  # append: a biblioteca padrao vem antes
 
-from portao_cifra import portao_cifra  # noqa: E402
+from portao_cifra import falhas_confianca, portao_cifra  # noqa: E402
+from portao_regras import MODOS_PROIBIDOS  # noqa: E402
 from portao_git import ErroGit, imprime, indice  # noqa: E402
 from portao_historico import ci, envio  # noqa: E402
 from portao_mensagem import assuntos, commit_msg, portao_autor  # noqa: E402
@@ -33,10 +34,13 @@ from portao_travessao import portao_travessao  # noqa: E402
 
 
 def pre_commit():
-    itens = indice()
+    itens = indice()  # (modo, hash, caminho)
+    regulares = [(s, c) for m, s, c in itens if m not in MODOS_PROIBIDOS]
+    n_conf, falhas_conf = falhas_confianca(regulares)
     res = [
         imprime("cifra", len(itens), *portao_cifra(itens)),
-        imprime("travessao", len(itens), *portao_travessao(itens)),
+        imprime("confianca", n_conf, n_conf - len(falhas_conf), falhas_conf),
+        imprime("travessao", len(regulares), *portao_travessao(regulares)),
         imprime("autor", 2, *portao_autor()),
     ]
     return all(res)

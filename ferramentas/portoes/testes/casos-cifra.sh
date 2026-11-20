@@ -63,7 +63,7 @@ caso TB9 REPROVA $? "forma nao aprovada em caminho de excecao" "$SCR/ci-tb9.txt"
 
 # TB10: cabecalho cifrado com corpo legivel, sem gate
 novo_repo tb10 && mkdir -p livro-1/texto && blob_falso 60 "$SCR/tb10.bin" && \
-    sha=$(git hash-object -w "$SCR/tb10.bin") && \
+    sha=$(git hash-object -w --no-filters "$SCR/tb10.bin") && \
     git update-index --add --cacheinfo "100644,$sha,livro-1/texto/f.md" && commit_sem_gate "feat: corpo legivel sem gate (SG-02)"
 ci_simulado tb10 "$ZERO" "$SCR/ci-tb10.txt"
 caso TB10 REPROVA $? "corpo legivel apos o cabecalho cifrado" "$SCR/ci-tb10.txt" "cabecalho falso com texto legivel"
@@ -76,7 +76,7 @@ caso TB11 OK $? "[ci-heuristica]" "$SCR/ci-tb11.txt" "controle: cifra real nao e
 
 # TB12a e TB12b: corpo pequeno (resíduo) e envio com chave
 novo_repo tb12 && remoto_novo tb12 && empurra tb12 >/dev/null 2>&1
-blob_falso 10 "$SCR/tb12.bin" && sha=$(git hash-object -w "$SCR/tb12.bin") && \
+blob_falso 10 "$SCR/tb12.bin" && sha=$(git hash-object -w --no-filters "$SCR/tb12.bin") && \
     git update-index --add --cacheinfo "100644,$sha,livro-1/texto/f.md" && commit_sem_gate "feat: corpo pequeno sem gate (SG-02)"
 ci_simulado tb12 "$ZERO" "$SCR/ci-tb12.txt"; rc12a=$?
 caso TB12a OK "$rc12a" "pequenos=1" "$SCR/ci-tb12.txt" "residuo declarado: corpo pequeno passa sem chave"
@@ -183,3 +183,25 @@ novo_repo tb27b && mkdir -p livro-1/texto && for i in $(seq 1 300); do printf 'A
 n300=$(wc -l < "$SCR/shim/chamadas")
 rc27=0; [ "$r5" -eq 0 ] && [ "$r300" -eq 0 ] && [ "$n5" = "$n300" ] || rc27=1
 caso TB27 OK "$rc27" - - "chamadas git iguais para 5 e 300 arquivos: $n5 e $n300"
+
+# TB28: dois arquivos cifrados no mesmo lote do cat-file com filtro. Compara o conteudo decifrado
+# byte a byte com a funcao de producao (conteudos_filtrados). O separador antigo (fatia pelo tamanho do
+# cabecalho) nao reprova o commit: devolve conteudo trocado em silencio. Por isso a prova e o conteudo.
+novo_repo tb28 && mkdir -p livro-1/texto && \
+    printf 'Primeiro capitulo: abertura do livro.\n' > livro-1/texto/a.md && \
+    printf 'Segundo capitulo: fim da historia.\n' > livro-1/texto/b.md && \
+    git add livro-1/texto/a.md livro-1/texto/b.md && commita -m "feat: dois capitulos no mesmo lote (SG-02)"
+cat > "$SCR/tb28-confere.py" <<'PY'
+import sys
+sys.path.append(sys.argv[1])
+from portao_git import indice, conteudos_filtrados
+esperado = {"livro-1/texto/a.md": b"Primeiro capitulo: abertura do livro.\n",
+            "livro-1/texto/b.md": b"Segundo capitulo: fim da historia.\n"}
+itens = [(s, c) for m, s, c in indice() if c in esperado]
+got = conteudos_filtrados(itens)
+ok = len(got) == 2 and all(g == esperado[c] for (_s, c), g in zip(itens, got))
+print("[tb28] conteudo conferido=" + ("sim" if ok else "nao"))
+sys.exit(0 if ok else 1)
+PY
+( cd "$SCR/tb28" && python3 -I "$SCR/tb28-confere.py" "$SCR/tb28/ferramentas/portoes" > "$SCR/saida-tb28.txt" 2>&1 ); rc28=$?
+caso TB28 OK "$rc28" "conteudo conferido=sim" "$SCR/saida-tb28.txt" "dois cifrados no mesmo lote do filtro, conteudo exato"

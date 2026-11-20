@@ -1,29 +1,125 @@
-"""Portao de cifra (SG-02): todo arquivo do indice fora da excecao tem cabecalho cifrado e filtro git-crypt."""
-from portao_git import atributos, conteudos, git_tenta
-from portao_regras import CABECALHO, FILTRO_EXIGIDO
+"""Portao de cifra (SG-02): classificacao de caminho (lista fechada), modo, binario, heuristica e confianca.
+
+Uma funcao de classificacao so (falha_caminho), usada por pre-commit, ci e envio (L-17).
+"""
+from portao_git import conteudos, git_tenta
+from portao_regras import (APROVADOS, BINARIOS, CABECALHO, CONTROLE, CORPO_MIN, EXCECOES, FILTRO_EXIGIDO,
+                           IMPRIMIVEIS, LIMIAR_LEGIVEL, MODOS_PROIBIDOS, TAMANHO_CABECALHO, TETO_BINARIO,
+                           ZONAS_DE_EXCECAO)
+
+# Bytes que nao sao legiveis, para contar por translate (C, sem laco Python por byte).
+NAO_IMPRIMIVEIS = bytes(b for b in range(256) if b not in IMPRIMIVEIS)
 
 
-def portao_cifra(itens):
-    falhas, analisados, cifrados = [], 0, 0
+def filtro_falhas():
+    """Filtro git-crypt configurado no repositorio (fail-open sem required, S57)."""
+    falhas = []
     for chave, valor_exigido in FILTRO_EXIGIDO:
         rc, val = git_tenta(["config", "--get", chave])
         valor = val.decode("utf-8").strip() if rc == 0 else ""
         if not valor or (valor_exigido is not None and valor != valor_exigido):
             falhas.append(f"filtro sem configuracao local: {chave}")
-    atr = atributos([c for _, c in itens])
-    corpos = conteudos([sha for sha, _ in itens])
-    for (_sha, caminho), corpo in zip(itens, corpos):
-        valor = atr.get(caminho, "")
-        if valor == "git-crypt":
-            cifrados += 1
-            if corpo.startswith(CABECALHO):
-                analisados += 1
-            else:
-                falhas.append(f"sem cabecalho cifrado no indice: {caminho}")
-        elif valor == "unspecified":
-            analisados += 1  # excecao declarada com !filter no .gitattributes
+    return falhas
+
+
+def modo_falha(modo, caminho):
+    if modo in MODOS_PROIBIDOS:
+        return f"modo de arquivo proibido (submodulo ou link simbolico): {caminho}"
+    return None
+
+
+def e_excecao(caminho):
+    return any(p.fullmatch(caminho) for p in EXCECOES)
+
+
+def e_zona(caminho):
+    return any(p.fullmatch(caminho) for p in ZONAS_DE_EXCECAO)
+
+
+def e_binario(caminho):
+    return caminho.endswith(BINARIOS)
+
+
+def falha_caminho(caminho, cifrado, rotulo=""):
+    """Regras 1 a 5 da OS 5.3, nesta ordem. cifrado: o blob tem o cabecalho. Devolve a falha ou None."""
+    if CONTROLE.search(caminho):
+        return f"caminho com quebra de linha ou caractere de controle: {caminho!r}"
+    if caminho.endswith("/.gitattributes"):
+        return f"gitattributes aninhado proibido: {caminho}"
+    if e_excecao(caminho):
+        return f"cifrado em caminho de excecao, refaca o git add: {caminho}" if cifrado else None
+    if e_zona(caminho):
+        return f"forma nao aprovada em caminho de excecao: {caminho}"
+    if not cifrado:
+        return f"{rotulo}sem cabecalho cifrado: {caminho}"
+    return None
+
+
+def falha_teto(caminho, tamanho):
+    """Binario cifrado com conteudo decifrado acima do teto (D7)."""
+    if e_binario(caminho) and tamanho > TETO_BINARIO:
+        return f"binario acima do teto: {caminho}"
+    return None
+
+
+def portao_cifra(itens):
+    """itens: (modo, hash, caminho) do indice. Devolve (analisados, falhas)."""
+    falhas = filtro_falhas()
+    regulares = []
+    for modo, sha, caminho in itens:
+        falha = modo_falha(modo, caminho)
+        if falha:
+            falhas.append(falha)
         else:
-            falhas.append(f"atributo filter={valor!r}, esperado git-crypt ou excecao: {caminho}")
+            regulares.append((sha, caminho))
+    corpos = dict(zip(sorted({s for s, _ in regulares}), conteudos(sorted({s for s, _ in regulares}))))
+    analisados, cifrados = 0, 0
+    for sha, caminho in regulares:
+        cifrado = corpos[sha].startswith(CABECALHO)
+        cifrados += cifrado
+        falha = falha_caminho(caminho, cifrado, rotulo="")
+        if falha is None:
+            analisados += 1
+        else:
+            falhas.append(falha)
     if cifrados == 0:
         falhas.append("nenhum arquivo cifrado no indice")
     return analisados, falhas
+
+
+def exige_aprovado(caminho):
+    """Arquivos de confianca: todo workflow e o ci-bootstrap.sh (SG-02, D2)."""
+    return caminho.startswith(".github/workflows/") or caminho == "ferramentas/portoes/ci-bootstrap.sh"
+
+
+def falhas_confianca(pares):
+    """Hash de blob de cada arquivo de confianca tem que estar em APROVADOS. Devolve (exigidos, falhas)."""
+    exigidos = [(s, c) for s, c in pares if exige_aprovado(c)]
+    falhas = [f"arquivo de confianca nao aprovado: {c}"
+              for s, c in exigidos if s not in APROVADOS.get(c, ())]
+    return len(exigidos), falhas
+
+
+def corpo_legivel(corpo):
+    """True/False pela fracao de bytes imprimiveis do corpo; None quando o corpo e pequeno demais (S14)."""
+    cauda = corpo[TAMANHO_CABECALHO:]
+    if len(cauda) < CORPO_MIN:
+        return None
+    imprimiveis = len(cauda.translate(None, NAO_IMPRIMIVEIS))
+    return imprimiveis / len(cauda) >= LIMIAR_LEGIVEL
+
+
+def heuristica(cifrados):
+    """cifrados: (caminho, corpo) de cada blob com cabecalho. Devolve (linha, falhas), sem chave (S14)."""
+    avaliados, pequenos, suspeitos = 0, 0, []
+    for caminho, corpo in cifrados:
+        legivel = corpo_legivel(corpo)
+        if legivel is None:
+            pequenos += 1
+            continue
+        avaliados += 1
+        if legivel:
+            suspeitos.append(caminho)
+    linha = (f"[ci-heuristica] cifrados={len(cifrados)} avaliados={avaliados} pequenos={pequenos} "
+             f"suspeitos={len(suspeitos)}")
+    return linha, [f"corpo legivel apos o cabecalho cifrado: {c}" for c in suspeitos]

@@ -7,8 +7,10 @@ rc=$?
 cat "$D/saida.txt"
 falhou=0
 [ "$rc" -eq 0 ] || { echo "  FALHOU portao da base saiu com rc=$rc"; falhou=1; }
-for nome in ci-commits ci-blobs; do
+for nome in ci-commits ci-blobs ci-confianca; do
     grep -q "^\[$nome\] encontrados=[1-9]" "$D/saida.txt" || {
         echo "  FALHOU saida do portao sem linha de contagem: $nome"; falhou=1; }
 done
+grep -q "^\[ci-heuristica\] cifrados=[1-9]" "$D/saida.txt" || {
+    echo "  FALHOU saida do portao sem linha de heuristica: ci-heuristica"; falhou=1; }
 exit "$falhou"

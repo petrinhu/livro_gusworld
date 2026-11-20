@@ -59,7 +59,7 @@ novo_repo ta8a && printf 'b\n' > b.md && git add b.md && commita -m "feat: b (SG
 caso TA8a OK "$rc8a" "[envio-chave] encontrados=" "$SCR/saida-envia.txt" "envio do historico limpo"
 
 novo_repo ta8b && remoto_novo ta8b && empurra ta8b >/dev/null 2>&1
-blob_falso 60 "$SCR/ta8b.bin" && sha=$(git hash-object -w "$SCR/ta8b.bin") && \
+blob_falso 60 "$SCR/ta8b.bin" && sha=$(git hash-object -w --no-filters "$SCR/ta8b.bin") && \
     git update-index --add --cacheinfo "100644,$sha,livro-1/texto/f.md" && \
     commit_sem_gate "feat: blob adulterado sem gate (SG-02)" && empurra ta8b; rc8b=$?
 caso TA8b REPROVA "$rc8b" "blob cifrado adulterado ou ilegivel com a chave" "$SCR/saida-envia.txt" "blob cifrado com texto legivel no envio"

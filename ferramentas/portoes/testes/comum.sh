@@ -109,9 +109,10 @@ remoto_novo() { # NOME: repositorio bare de scratch como origin
     git init -q --bare "$SCR/$1-remoto.git" && git -C "$SCR/$1" remote add origin "$SCR/$1-remoto.git"
 }
 
-empurra() { # NOME: push do ramo atual (main) para o origin de scratch; o pre-push passa pelo portao
+empurra() { # NOME: push do main para o origin de scratch; o pre-push passa pelo portao; autoriza o 1o envio (SG-02g)
     seguro "$SCR/$1" || return 1
-    git -C "$SCR/$1" push -q origin main > "$SCR/saida-envia.txt" 2>&1
+    PORTOES_PRIMEIRO_ENVIO=$(git -C "$SCR/$1" rev-parse -q --verify refs/heads/main) \
+        git -C "$SCR/$1" push -q origin main > "$SCR/saida-envia.txt" 2>&1
 }
 
 roda_bloco_yaml() { # CLONE BASE SAIDA: roda o bloco de verificacao do workflow do clone (SG-02)

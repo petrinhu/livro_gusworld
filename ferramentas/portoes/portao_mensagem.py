@@ -15,6 +15,8 @@ MENSAGEM_SESSAO_LOCAL = "linha de sessao (Claude-Session) proibida na mensagem"
 MENSAGEM_SESSAO_GRAVADA = "cita sessao (Claude-Session)"  # texto antigo, que os testes do ci e do envio usam
 MENSAGEM_TRAVESSAO = "travessao na mensagem"
 MENSAGEM_COMENTARIO = "mensagem comeca com linha de comentario"
+RODAPE = re.compile(r"Co-Authored-By: [^<>\n]+ <noreply@anthropic\.com>")
+MENSAGEM_RODAPE = "rodape fora do modelo 'Co-Authored-By: <modelo> <noreply@anthropic.com>'"
 
 # Codigos de travessao de mensagem e entidades que os nomeiam: a tabela HTML5 da biblioteca padrao.
 _CODIGOS = frozenset(ord(c) for c in TRAVESSOES)
@@ -81,6 +83,20 @@ def acima_da_tesoura(texto):
     return texto[:m.start()] if m else texto
 
 
+def falha_rodape(texto):
+    """Ultimo paragrafo (quando ha mais de um): toda linha com ':' e Co-Authored-By da Anthropic (SG-02)."""
+    paragrafos = [p for p in re.split(r"\n[ \t]*\n", texto.strip("\n")) if p.strip()]
+    if len(paragrafos) < 2:
+        return None
+    for ln in paragrafos[-1].split("\n"):
+        ln = ln.rstrip()
+        if ln.startswith("#"):
+            continue
+        if ":" in ln and not RODAPE.fullmatch(ln):
+            return MENSAGEM_RODAPE
+    return None
+
+
 def falhas_mensagem(texto, formato, gravada=False):
     """Falhas da mensagem, sem devolver o texto dela (V11).
 
@@ -97,6 +113,9 @@ def falhas_mensagem(texto, formato, gravada=False):
         falhas.append(MENSAGEM_SESSAO_GRAVADA if gravada else MENSAGEM_SESSAO_LOCAL)
     if tem_travessao(texto):
         falhas.append(MENSAGEM_TRAVESSAO)
+    rodape = falha_rodape(texto)
+    if rodape:
+        falhas.append(rodape)
     return falhas
 
 

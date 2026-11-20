@@ -56,6 +56,10 @@ TAMANHO_CABECALHO = 22  # 10 de cabecalho + 12 de nonce
 # Amostra em claro (SG-02, M1): teto por arquivo, pega a copia acidental de um capitulo inteiro.
 TETO_AMOSTRA = 8192
 AMOSTRA = re.compile(r"ferramentas/montagem/amostra/texto/c[0-9]{2}\.md")
+# Volume em claro (SG-02d, C1): a arvore e o indice (pre-commit), o HEAD (ci) ou cada ponta enviada (envio).
+TETO_CLARO = 16384  # cada arquivo em claro fora da amostra
+TETO_CLARO_ARVORE = 262144  # soma dos arquivos em claro de uma arvore
+TETO_AMOSTRA_ARVORE = 16384  # soma dos arquivos da amostra de uma arvore
 
 # Heuristica sem chave (S14, SG-02). Limiares fixados pela teoria de bytes aleatorios, antes do dado (L-43).
 # Cifra real medida: 72 blobs, corpo de 79 a 35175 bytes, nenhum suspeito por estas regras.
@@ -64,7 +68,8 @@ ASSINATURAS = (b"\x1f\x8b\x08", b"PK\x03\x04", b"BZh", b"\xfd7zXZ\x00", b"\x28\x
 CORPO_MIN = 12          # abaixo disso o corpo e pequeno e passa sem chave (classe K3)
 CORPO_CURTO = 24        # de 12 a 23 bytes: suspeito se todo byte for imprimivel
 CORPO_ESTATISTICO = 64  # a partir daqui: fracao de bytes altos e numero de valores distintos
-AMOSTRA_ESTATISTICA = 65536
+JANELA = 4096  # a estatistica vale em cada janela do corpo, nao num prefixo (SG-02d, C3)
+K_SIGMA = 7  # banda em desvios-padrao em torno do esperado de bytes aleatorios, em cada janela (SG-02d, A1)
 FAIXA_ALTOS = (0.20, 0.80)
 LIMIAR_LEGIVEL = 0.80
 IMPRIMIVEIS = frozenset(range(0x20, 0x7F)) | {0x09, 0x0A, 0x0D}

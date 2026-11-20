@@ -94,6 +94,15 @@ def conteudos_filtrados(pares):
     return separa_filtrado(raw, len(pares))
 
 
+def tamanhos(objetos):
+    """Tamanho de cada objeto, em um unico processo git (SG-02d). Devolve dict hash -> bytes."""
+    if not objetos:
+        return {}
+    entrada = "".join(f"{o}\n" for o in objetos).encode("ascii")
+    saida = git(["cat-file", "--batch-check=%(objectname) %(objectsize)"], entrada).decode("ascii")
+    return {h: int(t) for h, t in (ln.split(" ") for ln in saida.splitlines() if ln)}
+
+
 def cat_file_filtrado_bruto(pares):
     """Como conteudos_filtrados, mas devolve (rc, saida, stderr) sem falhar: o chamador decide o veredito."""
     entrada = "".join(f"{sha} {c}\n" for sha, c in pares).encode("utf-8")

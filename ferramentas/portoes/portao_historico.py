@@ -1,10 +1,10 @@
 """Portao de historico (SG-02): modo ci (historico inteiro, sem chave) e modo envio (pontas do pre-push)."""
 import os
 
-from portao_cifra import (e_binario, e_excecao, falha_amostra, falha_caminho, falha_teto, falhas_confianca,
-                          heuristica, modo_falha)
+from portao_cifra import (e_binario, e_excecao, falha_amostra, falha_caminho, falha_claro, falha_teto, falhas_confianca,
+                          falhas_volume, heuristica, modo_falha)
 from portao_git import (ErroGit, arvore, cat_file_filtrado_bruto, conteudos, falhou, git, git_tenta, imprime,
-                        pares_do_historico, separa_filtrado)
+                        pares_do_historico, separa_filtrado, tamanhos)
 from portao_mensagem import cita_sessao, falha_assunto, falhas_mensagem, tem_travessao
 from portao_regras import CABECALHO, MARCO, NOREPLY, TAMANHO_CABECALHO
 from portao_travessao import falha_travessao
@@ -127,6 +127,8 @@ def confere_pares(pares):
         falha = falha_caminho(caminho, cifrado, rotulo=f"blob {sha[:7]} ")
         if falha is None:
             falha = falha_amostra(caminho, len(corpos[sha]))
+        if falha is None and not cifrado:
+            falha = falha_claro(caminho, len(corpos[sha]))
         if falha is None and cifrado:
             falha = falha_teto(caminho, len(corpos[sha]) - TAMANHO_CABECALHO)
         if falha is None and not cifrado and e_excecao(caminho):
@@ -153,6 +155,8 @@ def ci():
     ok_assuntos = imprime("ci-assuntos", n_fmt, vistos, falhas_fmt, vazia_ok=True)
     pares = pares_do_historico(["--all"])
     analisados, falhas_blob, _cifrados, corpos = confere_pares(pares)
+    da_head = arvore("HEAD")
+    falhas_blob += falhas_volume(da_head, tamanhos(sorted({s for s, _ in da_head})))
     ok_blobs = imprime("ci-blobs", len(pares), analisados, falhas_blob)
     unicos = {}
     for sha, caminho, _modo in sorted(pares):
@@ -162,7 +166,7 @@ def ci():
     print(linha)
     for f in falhas_heu:
         falhou(f)
-    n_conf, falhas_conf = falhas_confianca(arvore("HEAD"))
+    n_conf, falhas_conf = falhas_confianca(da_head)
     ok_conf = imprime("ci-confianca", n_conf, n_conf - len(falhas_conf), falhas_conf)
     n_tag, falhas_tag = verifica_tags(None)
     ok_tags = imprime("ci-tags", n_tag, n_tag, falhas_tag, vazia_ok=True)
@@ -229,10 +233,14 @@ def envio(texto):
     ok_assuntos = imprime("envio-assuntos", n_fmt, vistos, falhas_fmt, vazia_ok=True)
     pares = pares_do_historico(revs) if locais else set()
     analisados, falhas_blob, cifrados, _corpos = confere_pares(pares)
+    arvores = [arvore(ponta) for ponta in locais]
+    tam = tamanhos(sorted({s for pares_ponta in arvores for s, _ in pares_ponta}))
+    for pares_ponta in arvores:
+        falhas_blob += falhas_volume(pares_ponta, tam)
     ok_blobs = imprime("envio-blobs", len(pares), analisados, falhas_blob, vazia_ok=True)
     da_arvore = set()
-    for ponta in locais:
-        da_arvore.update(arvore(ponta))
+    for pares_ponta in arvores:
+        da_arvore.update(pares_ponta)
     n_conf, falhas_conf = falhas_confianca(sorted(da_arvore))
     ok_conf = imprime("envio-confianca", n_conf, n_conf - len(falhas_conf), falhas_conf, vazia_ok=True)
     n_tag, falhas_tag = verifica_tags(set(locais))

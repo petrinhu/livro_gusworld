@@ -29,6 +29,12 @@ caso() { # ID ESPERADO(OK|REPROVA) RC TRECHO(ou -) ARQUIVO DESCRICAO
     local id=$1 esp=$2 rc=$3 trecho=$4 arq=$5 desc=$6 obt tr st
     CASOS=$((CASOS + 1))
     if [ "$rc" -eq 0 ]; then obt=OK; else obt=REPROVA; fi
+    # Guarda de rc (SG-02): 126, 127 ou acima de 128 = ferramenta quebrada (comando ausente, uso invalido), nunca veredito.
+    if [ "$rc" -eq 126 ] || [ "$rc" -eq 127 ] || [ "$rc" -gt 128 ]; then
+        FALHAS=$((FALHAS + 1))
+        printf '%s esperado=%s obtido=%s rc=%s trecho=na FALHOU de ferramenta | %s\n' "$id" "$esp" "$obt" "$rc" "$desc"
+        return 0
+    fi
     tr=na
     if [ "$trecho" != "-" ]; then
         if [ -f "$arq" ] && grep -qF -- "$trecho" "$arq"; then tr=sim; else tr=nao; fi

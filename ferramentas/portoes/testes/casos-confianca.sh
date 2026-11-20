@@ -80,6 +80,6 @@ novo_repo ta10 && printf 'b\n' > b.md && git add b.md && commita -m "feat: base 
 git switch -q -c c && sha=$(printf 'Canon.\n' | git hash-object -w --stdin) && \
     git update-index --add --cacheinfo "100644,$sha,canon/k.md" && \
     commit_sem_gate "feat: canon sem gate (SG-02)" && CH=$(git rev-parse HEAD)
-git switch -q main && git cherry-pick -q "$CH" > "$SCR/saida.txt" 2>&1
+git switch -q main && git cherry-pick "$CH" > "$SCR/saida.txt" 2>&1
 empurra ta10; rc10=$?
 caso TA10 REPROVA "$rc10" "sem cabecalho cifrado" "$SCR/saida-envia.txt" "cherry-pick traz blob em claro"

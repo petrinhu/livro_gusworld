@@ -87,5 +87,10 @@ caso C04 REPROVA $? - - "ci negativo, Claude-Session no historico"
 
 # C05 precisa de historico vazio: repositorio nu, sem semente.
 mkdir -p "$SCR/c05" && git -C "$SCR/c05" init -q -b main
-ci_aqui c05 "$ZERO" "$SCR/ci-c05.txt"
-caso C05 REPROVA $? - - "ci varredura vazia, historico sem commit"
+if [ "$MODO" = novo ]; then
+    ( cd "$SCR/c05" && BASE_PUSH="$ZERO" sh "$FONTE/ci-bootstrap.sh" ) > "$SCR/ci-c05.txt" 2>&1; rc05=$?
+    caso C05 REPROVA "$rc05" "historico vazio" "$SCR/ci-c05.txt" "ci varredura vazia, historico sem commit (ci-bootstrap da fonte)"
+else
+    ci_aqui c05 "$ZERO" "$SCR/ci-c05.txt"
+    caso C05 REPROVA $? - - "ci varredura vazia, historico sem commit (legado: portoes.py ci)"
+fi

@@ -159,11 +159,20 @@ def pares_do_historico(revs):
     return pares
 
 
+FALHAS_IMPRESSAS = [0]
+
+
+def falhou(texto):
+    """Imprime uma linha de falha e conta (SG-02): o codigo de saida nao depende so do valor devolvido."""
+    FALHAS_IMPRESSAS[0] += 1
+    print(f"  FALHOU {texto}")
+
+
 def imprime(nome, encontrados, analisados, falhas, vazia_ok=False):
     """Linha de contagem e falhas. Zero so vale quando vazia_ok (envio sem commit novo, sem blob)."""
     print(f"[{nome}] encontrados={encontrados} analisados={analisados} falharam={len(falhas)}")
     if encontrados == 0 and not vazia_ok:
-        print("  FALHOU varredura vazia: piso de verificacao zero (L-36)")
+        falhou("varredura vazia: piso de verificacao zero (L-36)")
     for f in falhas:
-        print(f"  FALHOU {f}")
+        falhou(f)
     return (encontrados > 0 or vazia_ok) and analisados == encontrados and not falhas

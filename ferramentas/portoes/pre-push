@@ -19,8 +19,11 @@ while read -r _ref_l _sha_l _ref_r sha_r; do
             ;;
     esac
 done < "$ENT"
+if [ "$REV" = HEAD ]; then
+    PUB=$(git rev-parse -q --verify "refs/remotes/$1/main^{commit}") && REV=$PUB
+fi
 extrai_portao "$REV" || exit 1
-python3 -I "$PORTAO_DIR/portoes.py" envio < "$ENT" || exit 1
+roda_portao envio < "$ENT" || exit 1
 GLOBAL="${HOME:-/nonexistent}/.claude/githooks/pre-push"
 if [ -x "$GLOBAL" ]; then
     "$GLOBAL" "$@" < "$ENT"

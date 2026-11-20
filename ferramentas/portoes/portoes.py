@@ -27,7 +27,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))  # append: a bibliot
 
 from portao_cifra import falhas_confianca, portao_cifra  # noqa: E402
 from portao_regras import MODOS_PROIBIDOS  # noqa: E402
-from portao_git import ErroGit, imprime, indice  # noqa: E402
+from portao_git import FALHAS_IMPRESSAS, ErroGit, imprime, indice  # noqa: E402
 from portao_historico import ci, envio  # noqa: E402
 from portao_mensagem import assuntos, commit_msg, portao_autor  # noqa: E402
 from portao_travessao import portao_travessao  # noqa: E402
@@ -65,7 +65,7 @@ def main(argv):
     except (ErroGit, OSError, ValueError, UnicodeDecodeError) as e:
         print(f"ERRO (portao fecha por seguranca): {e}")
         return 1
-    return 0 if ok else 1
+    return 0 if ok and FALHAS_IMPRESSAS[0] == 0 else 1
 
 
 if __name__ == "__main__":

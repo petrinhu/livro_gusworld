@@ -3,7 +3,7 @@ import os
 
 from portao_cifra import (e_binario, e_excecao, falha_amostra, falha_caminho, falha_teto, falhas_confianca,
                           heuristica, modo_falha)
-from portao_git import (ErroGit, arvore, cat_file_filtrado_bruto, conteudos, git, git_tenta, imprime,
+from portao_git import (ErroGit, arvore, cat_file_filtrado_bruto, conteudos, falhou, git, git_tenta, imprime,
                         pares_do_historico, separa_filtrado)
 from portao_mensagem import cita_sessao, falha_assunto, falhas_mensagem, tem_travessao
 from portao_regras import CABECALHO, MARCO, NOREPLY, TAMANHO_CABECALHO
@@ -142,7 +142,8 @@ def confere_pares(pares):
 
 def ci():
     if not git(["rev-list", "--all"]).strip():
-        print("[ci-commits] FALHOU historico vazio")
+        print("[ci-commits] encontrados=0 analisados=0 falharam=1")
+        falhou("historico vazio")
         return False
     n_ref, falhas_ref = refs_e_raso()
     ok_refs = imprime("ci-refs", n_ref, n_ref, falhas_ref)
@@ -160,7 +161,7 @@ def ci():
     linha, falhas_heu = heuristica([(c, corpos[s]) for s, c in sorted(unicos.items(), key=lambda t: t[1])])
     print(linha)
     for f in falhas_heu:
-        print(f"  FALHOU {f}")
+        falhou(f)
     n_conf, falhas_conf = falhas_confianca(arvore("HEAD"))
     ok_conf = imprime("ci-confianca", n_conf, n_conf - len(falhas_conf), falhas_conf)
     n_tag, falhas_tag = verifica_tags(None)
@@ -190,7 +191,7 @@ def envio_chave(cifrados):
     chave = git(["rev-parse", "--git-path", "git-crypt/keys/default"]).decode("utf-8").strip()
     if not os.path.exists(chave):
         print("[envio-chave] encontrados=0 analisados=0 falharam=1")
-        print("  FALHOU chave ausente: envio exige o repositorio desbloqueado")
+        falhou("chave ausente: envio exige o repositorio desbloqueado")
         return False
     falhas, analisados = [], 0
     if cifrados:

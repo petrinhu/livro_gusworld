@@ -5,7 +5,7 @@ AQUI=$(cd "$(dirname "$0")" && pwd) || exit 1
 . "$AQUI/confiavel.sh" || exit 1
 confere_instalacao commit-msg "$AQUI" || exit 1
 extrai_portao HEAD || exit 1
-python3 -I "$PORTAO_DIR/portoes.py" commit-msg "$1" || exit 1
+roda_portao commit-msg "$1" || exit 1
 GLOBAL="${HOME:-/nonexistent}/.claude/githooks/commit-msg"
 if [ -x "$GLOBAL" ]; then
     "$GLOBAL" "$@"

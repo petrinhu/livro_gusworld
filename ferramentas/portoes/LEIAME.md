@@ -57,7 +57,16 @@ Também são recusados:
 - arquivo que não é `.md` dentro de pasta de texto (`livro-*/texto/` e `ferramentas/montagem/amostra/texto/`);
 - arquivo da amostra em claro acima de 8192 bytes (`ferramentas/montagem/amostra/texto/cNN.md`).
 
-Sem chave, o CI só vê o cabeçalho e o corpo cifrado. Um corpo cifrado é suspeito se começa com assinatura de formato (gzip, zip, bzip2, xz, zstd, 7z ou BOM); ou, de 12 a 23 bytes, se todo byte é imprimível; ou, de 24 bytes ou mais, se 80% ou mais dos bytes são imprimíveis; ou, de 64 bytes ou mais, se a fração de bytes de 0x80 para cima sai da faixa de 0,20 a 0,80; ou se tem menos da metade dos valores distintos esperados para bytes aleatórios. Os limiares foram fixados antes de medir, e o histórico real não dispara nenhuma regra. Essas regras estreitam a classe K3 (abaixo), não a fecham.
+Sem chave, o CI só vê o cabeçalho e o corpo cifrado. Um corpo cifrado é suspeito se começa com assinatura de formato (gzip, zip, bzip2, xz, zstd, 7z ou BOM); ou, de 12 a 23 bytes, se todo byte é imprimível; ou, de 24 bytes ou mais, se 80% ou mais dos bytes são imprimíveis; ou, de 64 bytes ou mais, se alguma janela de 4096 bytes do corpo (a última menor que 64 bytes se junta à anterior) sai da banda de 7 desvios-padrão para bytes aleatórios na fração de imprimíveis ou na de bytes de 0x80 para cima, ou sai da faixa de 0,20 a 0,80 nos bytes altos, ou tem menos da metade dos valores distintos esperados para bytes aleatórios. Os limiares foram fixados antes de medir, e o histórico real não dispara nenhuma regra. Essas regras estreitam a classe K3 (abaixo), não a fecham: texto diluído a cerca de 5% por janela passa sem chave.
+
+## Tetos de volume, de mensagem e de objeto
+
+- Texto em claro fora da amostra: até 16384 bytes por arquivo (`falha_claro`, em `portao_cifra.py`).
+- Soma do texto em claro de uma árvore: até 262144 bytes. Soma da amostra de uma árvore: até 16384 bytes. Medidos por `falhas_volume` na árvore do índice (pre-commit), no HEAD (CI) e em cada ponta enviada (envio).
+- Mensagem de commit ou de tag: até 2048 bytes. No commit local, a conta deixa de fora as linhas de comentário que o git apaga (`portao_mensagem.py`).
+- Objeto commit ou tag inteiro (autor, cabeçalhos e mensagem): até 4096 bytes, medido com `cat-file --batch-check` (`portao_historico.py`).
+- Tag anotada é julgada pelo objeto, não pela ref: o objeto tag tem que apontar direto para um commit. Tag aninhada (tag de tag) reprova no CI e no envio, que são os modos que veem tags. O tagger segue NOREPLY.
+- Mudar um teto é um commit visível em `portao_regras.py`, julgado pelo portão do commit anterior, como qualquer mudança de código de portão.
 
 ## Regras de travessão
 
@@ -110,5 +119,6 @@ O líder aceitou os riscos K1, K2 e K3 em 20/11/2026, às 03:42 (registro em `ca
 - **Primeiro envio sem base de comparação (à parte das classes K1 a K3).** Sem `main` no remoto, o `pre-push` julga pelo HEAD. Controle: a verificação do SG-04, fora do repositório, sobre clone novo. O primeiro envio público só sai depois do SG-04 e de novo sim do líder (registro de 20/11/2026, 03:07, no mesmo arquivo).
 - **R5: texto em claro em caminho permitido.** Controle: a lista de caminhos em claro é fechada e só muda por commit visível no código do portão.
 - **R6: nomes e tamanhos de caminho visíveis.** Controle: nomes neutros, e a decisão de aceitar o tamanho tomada no SG-01.
+- **K4: texto curto que cabe na forma, em lugar público, dentro dos tetos.** Um trecho curto em arquivo de ferramenta, na amostra, em mensagem de commit ou de tag, inclusive enredo no assunto, passa pela forma e pelos tetos. Controle: os tetos acima e a revisão do diff. Estado: pendente de decisão do líder.
 
 Diretório pai: [ferramentas](../LEIAME.md).

@@ -19,7 +19,7 @@ SESSAO = (re.compile(r"claude[\W_]*session"), re.compile(r"claude\.ai"), re.comp
 # Linha-tesoura que o git coloca com --cleanup=scissors / commit -v: o gancho local julga so o que vem antes.
 TESOURA = re.compile(r"^# -+ >8 -+$", re.MULTILINE)
 # Ultimo commit antes desta OS (SG-02): o formato do assunto nao vale para o historico ate ele (D5, sem reescrita).
-MARCO = "6b98df7fd4eb2be6493bbf214c8a995748b34272"
+MARCO = "0208038b82e12389311b73b4a2472447af7c2a6c"
 FILTRO_EXIGIDO = (
     ("filter.git-crypt.clean", None),
     ("filter.git-crypt.smudge", None),

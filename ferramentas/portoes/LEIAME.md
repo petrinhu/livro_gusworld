@@ -57,7 +57,7 @@ Também são recusados:
 - arquivo que não é `.md` dentro de pasta de texto (`livro-*/texto/` e `ferramentas/montagem/amostra/texto/`);
 - arquivo da amostra em claro acima de 8192 bytes (`ferramentas/montagem/amostra/texto/cNN.md`).
 
-Sem chave, o CI só vê o cabeçalho e o corpo cifrado. Um corpo cifrado é suspeito se começa com assinatura de formato (gzip, zip, bzip2, xz, zstd, 7z ou BOM); ou, de 12 a 23 bytes, se todo byte é imprimível; ou, de 24 bytes ou mais, se 80% ou mais dos bytes são imprimíveis; ou, de 64 bytes ou mais, se alguma janela de 4096 bytes do corpo (a última menor que 64 bytes se junta à anterior) sai da banda de 7 desvios-padrão para bytes aleatórios na fração de imprimíveis ou na de bytes de 0x80 para cima, ou sai da faixa de 0,20 a 0,80 nos bytes altos, ou tem menos da metade dos valores distintos esperados para bytes aleatórios. Os limiares foram fixados antes de medir, e o histórico real não dispara nenhuma regra. Essas regras estreitam a classe K3 (abaixo), não a fecham: texto diluído a cerca de 5% por janela passa sem chave.
+Sem chave, o CI só vê o cabeçalho e o corpo cifrado. Um corpo cifrado é suspeito se começa com assinatura de formato (gzip, zip, bzip2, xz, zstd, 7z ou BOM); ou, de 12 a 23 bytes, se todo byte é imprimível; ou, de 24 bytes ou mais, se 80% ou mais dos bytes são imprimíveis; ou, de 64 bytes ou mais, se alguma janela de 4096 bytes do corpo (a última menor que 64 bytes se junta à anterior, sem pular nenhuma janela) sai da banda de 7 desvios-padrão para bytes aleatórios na fração de imprimíveis ou na de bytes de 0x80 para cima, ou sai da faixa de 0,20 a 0,80 nos bytes altos, ou tem menos da metade dos valores distintos esperados para bytes aleatórios. Os limiares foram fixados antes de medir, e o histórico real não dispara nenhuma regra. Essas regras estreitam a classe K3 (abaixo), não a fecham: texto diluído a cerca de 5% por janela passa sem chave.
 
 ## Tetos de volume, de mensagem e de objeto
 
@@ -67,6 +67,14 @@ Sem chave, o CI só vê o cabeçalho e o corpo cifrado. Um corpo cifrado é susp
 - Objeto commit ou tag inteiro (autor, cabeçalhos e mensagem): até 4096 bytes, medido com `cat-file --batch-check` (`portao_historico.py`).
 - Tag anotada é julgada pelo objeto, não pela ref: o objeto tag tem que apontar direto para um commit. Tag aninhada (tag de tag) reprova no CI e no envio, que são os modos que veem tags. O tagger segue NOREPLY.
 - Mudar um teto é um commit visível em `portao_regras.py`, julgado pelo portão do commit anterior, como qualquer mudança de código de portão.
+
+## Soma do que sai em claro
+
+- Envio: o `pre-push` soma o que o envio ainda não publicou, fora do que o remoto já tem, de toda ref remota conhecida e do histórico até a `LINHA_DE_BASE` (`portao_regras.py`): blobs em claro únicos até 393216 bytes, amostra até 16384 e objetos commit e tag até 32768. A linha `[envio-orcamento]` mostra a conta.
+- CI: o portão da base soma tudo desde a `LINHA_DE_BASE` (sem ela no repositório, o histórico inteiro): blobs em claro únicos até 524288 bytes, amostra até 32768 e objetos commit e tag até 65536. A linha `[ci-orcamento]` mostra a conta e a base.
+- O que um envio fatiado dentro do teto, ou um envio pulando os ganchos, põe no remoto só o CI pega, e só depois de publicado.
+- Renovação: commit próprio que muda só a linha `LINHA_DE_BASE` para um commit já publicado e revisado, com aceite do líder, quando a linha `[ci-orcamento]` passar de 393216 bytes em claro. A base nova só vale a partir do envio seguinte ao da renovação. Renovar depois do estouro deixa vermelho o CI do próprio envio da renovação; o envio seguinte volta ao verde.
+- A renovação zera a conta. O acúmulo entre renovações só é limitado por ela ser um commit visível, julgado pelo portão anterior, com aceite do líder.
 
 ## Regras de travessão
 

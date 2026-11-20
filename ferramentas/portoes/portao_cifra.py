@@ -3,9 +3,10 @@
 Uma funcao de classificacao so (falha_caminho), usada por pre-commit, ci e envio (L-17).
 """
 from portao_git import conteudos, git_tenta
-from portao_regras import (APROVADOS, BINARIOS, CABECALHO, CONTROLE, CORPO_MIN, EXCECOES, FILTRO_EXIGIDO,
-                           IMPRIMIVEIS, LIMIAR_LEGIVEL, MODOS_PROIBIDOS, TAMANHO_CABECALHO, TETO_BINARIO,
-                           ZONAS_DE_EXCECAO)
+from portao_regras import (AMOSTRA, APROVADOS, AMOSTRA_ESTATISTICA, ASSINATURAS, BINARIOS, CABECALHO, CONTROLE,
+                           CORPO_CURTO, CORPO_ESTATISTICO, CORPO_MIN, EXCECOES, FAIXA_ALTOS, FALA, FILTRO_EXIGIDO,
+                           IMPRIMIVEIS, LIMIAR_LEGIVEL, MODOS_PROIBIDOS, TAMANHO_CABECALHO, TETO_AMOSTRA,
+                           TETO_BINARIO, ZONAS_DE_EXCECAO)
 
 # Bytes que nao sao legiveis, para contar por translate (C, sem laco Python por byte).
 NAO_IMPRIMIVEIS = bytes(b for b in range(256) if b not in IMPRIMIVEIS)
@@ -46,12 +47,21 @@ def falha_caminho(caminho, cifrado, rotulo=""):
         return f"caminho com quebra de linha ou caractere de controle: {caminho!r}"
     if caminho.endswith("/.gitattributes"):
         return f"gitattributes aninhado proibido: {caminho}"
+    if FALA.match(caminho) and not caminho.endswith(".md"):
+        return f"forma nao aprovada em pasta de texto: {caminho}"
     if e_excecao(caminho):
         return f"cifrado em caminho de excecao, refaca o git add: {caminho}" if cifrado else None
     if e_zona(caminho):
         return f"forma nao aprovada em caminho de excecao: {caminho}"
     if not cifrado:
         return f"{rotulo}sem cabecalho cifrado: {caminho}"
+    return None
+
+
+def falha_amostra(caminho, tamanho):
+    """Amostra em claro acima do teto (SG-02, M1). tamanho: bytes do blob (sem cabecalho, ele nao tem)."""
+    if AMOSTRA.fullmatch(caminho) and tamanho > TETO_AMOSTRA:
+        return f"amostra acima do teto: {caminho}"
     return None
 
 
@@ -77,7 +87,7 @@ def portao_cifra(itens):
     for sha, caminho in regulares:
         cifrado = corpos[sha].startswith(CABECALHO)
         cifrados += cifrado
-        falha = falha_caminho(caminho, cifrado, rotulo="")
+        falha = falha_caminho(caminho, cifrado, rotulo="") or falha_amostra(caminho, len(corpos[sha]))
         if falha is None:
             analisados += 1
         else:
@@ -100,26 +110,44 @@ def falhas_confianca(pares):
     return len(exigidos), falhas
 
 
-def corpo_legivel(corpo):
-    """True/False pela fracao de bytes imprimiveis do corpo; None quando o corpo e pequeno demais (S14)."""
+BAIXOS = bytes(range(0x80))  # para contar bytes de 0x80 para cima por translate, sem laco por byte
+
+
+def motivo_suspeito(corpo):
+    """Motivo da suspeita do corpo depois do cabecalho; '' se nao suspeito; None se pequeno (S14, SG-02)."""
     cauda = corpo[TAMANHO_CABECALHO:]
-    if len(cauda) < CORPO_MIN:
+    n = len(cauda)
+    if cauda.startswith(ASSINATURAS):
+        return "assinatura"
+    if n < CORPO_MIN:
         return None
     imprimiveis = len(cauda.translate(None, NAO_IMPRIMIVEIS))
-    return imprimiveis / len(cauda) >= LIMIAR_LEGIVEL
+    if n < CORPO_CURTO:
+        return "curto" if imprimiveis == n else ""
+    if imprimiveis / n >= LIMIAR_LEGIVEL:
+        return "legivel"
+    if n >= CORPO_ESTATISTICO:
+        amostra = cauda[:AMOSTRA_ESTATISTICA]
+        k = len(amostra)
+        altos = len(amostra.translate(None, BAIXOS)) / k
+        if not FAIXA_ALTOS[0] <= altos <= FAIXA_ALTOS[1]:
+            return "altos"
+        if len(set(amostra)) < 256 * (1 - (255 / 256) ** k) / 2:
+            return "distintos"
+    return ""
 
 
 def heuristica(cifrados):
-    """cifrados: (caminho, corpo) de cada blob com cabecalho. Devolve (linha, falhas), sem chave (S14)."""
+    """cifrados: (caminho, corpo) de cada blob com cabecalho. Devolve (linha, falhas), sem chave (S14, SG-02)."""
     avaliados, pequenos, suspeitos = 0, 0, []
     for caminho, corpo in cifrados:
-        legivel = corpo_legivel(corpo)
-        if legivel is None:
+        motivo = motivo_suspeito(corpo)
+        if motivo is None:
             pequenos += 1
             continue
         avaliados += 1
-        if legivel:
-            suspeitos.append(caminho)
+        if motivo:
+            suspeitos.append((caminho, motivo))
     linha = (f"[ci-heuristica] cifrados={len(cifrados)} avaliados={avaliados} pequenos={pequenos} "
              f"suspeitos={len(suspeitos)}")
-    return linha, [f"corpo legivel apos o cabecalho cifrado: {c}" for c in suspeitos]
+    return linha, [f"corpo legivel apos o cabecalho cifrado ({motivo}): {c}" for c, motivo in suspeitos]

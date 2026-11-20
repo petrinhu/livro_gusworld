@@ -1,8 +1,8 @@
 """Portao de historico (SG-02): modo ci (historico inteiro, sem chave) e modo envio (pontas do pre-push)."""
 import os
 
-from portao_cifra import (e_binario, e_excecao, falha_caminho, falha_teto, falhas_confianca, heuristica,
-                          modo_falha)
+from portao_cifra import (e_binario, e_excecao, falha_amostra, falha_caminho, falha_teto, falhas_confianca,
+                          heuristica, modo_falha)
 from portao_git import (ErroGit, arvore, cat_file_filtrado_bruto, conteudos, git, git_tenta, imprime,
                         pares_do_historico, separa_filtrado)
 from portao_mensagem import cita_sessao, falha_assunto, falhas_mensagem, tem_travessao
@@ -125,6 +125,8 @@ def confere_pares(pares):
     for sha, caminho in regulares:
         cifrado = corpos[sha].startswith(CABECALHO)
         falha = falha_caminho(caminho, cifrado, rotulo=f"blob {sha[:7]} ")
+        if falha is None:
+            falha = falha_amostra(caminho, len(corpos[sha]))
         if falha is None and cifrado:
             falha = falha_teto(caminho, len(corpos[sha]) - TAMANHO_CABECALHO)
         if falha is None and not cifrado and e_excecao(caminho):

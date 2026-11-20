@@ -53,8 +53,18 @@ MODOS_PROIBIDOS = ("160000", "120000")  # submodulo e link simbolico
 BINARIOS = (".png", ".jpg", ".jpeg", ".webp", ".gif", ".pdf", ".ttf", ".otf", ".woff", ".woff2")
 TETO_BINARIO = 50 * 1024 * 1024
 TAMANHO_CABECALHO = 22  # 10 de cabecalho + 12 de nonce
+# Amostra em claro (SG-02, M1): teto por arquivo, pega a copia acidental de um capitulo inteiro.
+TETO_AMOSTRA = 8192
+AMOSTRA = re.compile(r"ferramentas/montagem/amostra/texto/c[0-9]{2}\.md")
 
-# Heuristica sem chave (S14). Limiar fixado antes do dado (L-43): cifra real fica entre 0,324 e 0,479.
-CORPO_MIN = 24
+# Heuristica sem chave (S14, SG-02). Limiares fixados pela teoria de bytes aleatorios, antes do dado (L-43).
+# Cifra real medida: 72 blobs, corpo de 79 a 35175 bytes, nenhum suspeito por estas regras.
+ASSINATURAS = (b"\x1f\x8b\x08", b"PK\x03\x04", b"BZh", b"\xfd7zXZ\x00", b"\x28\xb5\x2f\xfd",
+               b"7z\xbc\xaf\x27\x1c", b"\xef\xbb\xbf")
+CORPO_MIN = 12          # abaixo disso o corpo e pequeno e passa sem chave (classe K3)
+CORPO_CURTO = 24        # de 12 a 23 bytes: suspeito se todo byte for imprimivel
+CORPO_ESTATISTICO = 64  # a partir daqui: fracao de bytes altos e numero de valores distintos
+AMOSTRA_ESTATISTICA = 65536
+FAIXA_ALTOS = (0.20, 0.80)
 LIMIAR_LEGIVEL = 0.80
 IMPRIMIVEIS = frozenset(range(0x20, 0x7F)) | {0x09, 0x0A, 0x0D}

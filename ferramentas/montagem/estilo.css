@@ -24,7 +24,7 @@ p {
   -webkit-hyphens: auto;
 }
 
-:lang(pt) {
+p:lang(pt) {
   hyphens: auto;
   -webkit-hyphens: auto;
 }

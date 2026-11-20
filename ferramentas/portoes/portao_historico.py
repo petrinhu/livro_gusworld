@@ -1,7 +1,8 @@
 """Portao de historico (SG-02): modo ci (historico inteiro, sem chave) e modo envio (pontas do pre-push)."""
 import os
 
-from portao_cifra import e_excecao, falha_caminho, falha_teto, falhas_confianca, heuristica, modo_falha
+from portao_cifra import (e_binario, e_excecao, falha_caminho, falha_teto, falhas_confianca, heuristica,
+                          modo_falha)
 from portao_git import (ErroGit, arvore, cat_file_filtrado_bruto, conteudos, git, git_tenta, imprime,
                         pares_do_historico, separa_filtrado)
 from portao_mensagem import cita_sessao, falha_assunto, falhas_mensagem, tem_travessao
@@ -96,6 +97,13 @@ def falha_texto_claro(caminho, corpo):
     except UnicodeDecodeError:
         return f"nao e UTF-8, nao analisado: {caminho}"
     return falha_travessao(caminho, texto)
+
+
+def falha_decifrado(caminho, corpo):
+    """Conteudo decifrado com cabecalho ausente: binario pelo teto; texto por UTF-8 e travessao (SG-02, OS 5.3)."""
+    if e_binario(caminho):
+        return falha_teto(caminho, len(corpo))
+    return falha_texto_claro(caminho, corpo)
 
 
 def confere_pares(pares):
@@ -195,6 +203,10 @@ def envio_chave(cifrados):
             for (_s, c), corpo in zip(cifrados, separa_filtrado(saida, len(cifrados))):
                 if corpo.startswith(CABECALHO):
                     falhas.append(f"{msg}: {c}")
+                    continue
+                falha = falha_decifrado(c, corpo)
+                if falha:
+                    falhas.append(falha)
                 else:
                     analisados += 1
     return imprime("envio-chave", len(cifrados), analisados, falhas, vazia_ok=True)

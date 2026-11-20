@@ -60,3 +60,11 @@ novo_repo td10 && mkdir -p ferramentas/montagem/amostra/texto && \
     commit_sem_gate "feat: entidade em amostra sem gate (SG-02)"
 ci_simulado td10 "$ZERO" "$SCR/ci-td10.txt"
 caso TD10 REPROVA $? "travessao fora de inicio de fala" "$SCR/ci-td10.txt" "entidade em amostra, CI"
+
+# TD11 (SG-02, pendencia da OS 5.3): envio com chave confere travessao no conteudo DECIFRADO.
+# O commit passa sem gate; so o envio, com a chave, ve o texto em claro.
+novo_repo td11 && remoto_novo td11 && empurra td11 >/dev/null 2>&1 && \
+    mkdir -p livro-1/texto && printf 'Ele disse %smdash; oi.\n' "$AMP" > livro-1/texto/d11.md && \
+    git add livro-1/texto/d11.md && commit_sem_gate "feat: travessao cifrado sem gate (SG-02)" && \
+    empurra td11; rc11=$?
+caso TD11 REPROVA "$rc11" "travessao fora de inicio de fala" "$SCR/saida-envia.txt" "envio com chave le o decifrado"

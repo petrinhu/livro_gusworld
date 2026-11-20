@@ -225,7 +225,7 @@ echo "== montar.sh (SG-02, TM5 e TM6)"
 
 saida_dir="$(git -C "$montagem" rev-parse --show-toplevel)/saida"
 rm -rf "$tmp/amostra-m5" && cp -R "$montagem/amostra" "$tmp/amostra-m5" && \
-  printf '\nFaixa 1%s2.\n' "$(printf '\342\200\223')" >> "$tmp/amostra-m5/texto/c01.md"
+  printf '\nFaixa 1--2.\n' >> "$tmp/amostra-m5/texto/c01.md"
 saida_m5=$(bash "$montagem/montar.sh" "$tmp/amostra-m5" 2>&1); rc_m5=$?
 total=$((total + 1))
 if [ "$rc_m5" -ne 0 ] && printf '%s\n' "$saida_m5" | grep -qF -- "travessao fora de inicio de fala na saida"; then

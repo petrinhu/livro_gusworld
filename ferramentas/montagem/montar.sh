@@ -70,7 +70,6 @@ pandoc "${CAPITULOS[@]}" \
   --toc --toc-depth=2 \
   --lua-filter="$FILTRO" \
   -o "$TMP_HTML"
-mv -f "$TMP_HTML" "$SAIDA/$NOME.html"
 
 # ePub 3, pelo mesmo caminho.
 TMP_EPUB="$SAIDA/$NOME.epub.tmp"
@@ -80,6 +79,14 @@ pandoc "${CAPITULOS[@]}" \
   --toc --toc-depth=2 \
   --lua-filter="$FILTRO" \
   -o "$TMP_EPUB"
+
+# Varredura antes de trocar qualquer saida (SG-02, OS 5.5): travessao so abrindo fala, dentro de <p>.
+if ! python3 -I "$SCRIPT_DIR/varrer_saida.py" "$TMP_HTML" "$TMP_EPUB"; then
+  rm -f "$TMP_HTML" "$TMP_EPUB"
+  echo "FALHA: varredura da saida reprovou; nenhuma saida foi trocada em $SAIDA" >&2
+  exit 1
+fi
+mv -f "$TMP_HTML" "$SAIDA/$NOME.html"
 mv -f "$TMP_EPUB" "$SAIDA/$NOME.epub"
 
 for arq in "$SAIDA/$NOME.html" "$SAIDA/$NOME.epub"; do

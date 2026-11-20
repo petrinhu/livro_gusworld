@@ -31,7 +31,7 @@ Antes de mover os arquivos para `saida/`, `montar.sh` roda `varrer_saida.py` sob
 
 - Cada traço da lista de travessões (U+2014, U+2013, U+2015, U+2012, U+2E3A, U+2E3B, U+FE58, U+FE31 e U+FE32) aparece na saída como entidade ou como caractere. A varredura troca as entidades antes de olhar.
 - U+2014 só é aceito se abrir fala: o texto anterior, até 300 caracteres para trás, termina numa abertura de parágrafo `<p>` seguida só de espaços. Os outros traços da lista são sempre recusados.
-- A saída mostra `[saida] encontrados=D analisados=D falharam=F`, onde `D` é o número de documentos varridos. Zero documento reprova. Para cada falha, mostra o arquivo e a posição, nunca o texto.
+- A saída mostra `[saida] encontrados=D analisados=D falharam=F`, onde `D` é o número de documentos varridos. Zero documento reprova. Para cada falha, mostra o arquivo e a linha, nunca o texto.
 - Se a varredura reprova, `montar.sh` apaga os temporários e sai com status diferente de zero.
 
 A varredura é a segunda barreira. A primeira é o portão de commit, que já barra esses traços no fonte.

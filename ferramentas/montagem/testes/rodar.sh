@@ -193,6 +193,54 @@ afirma "verificar: raiz que não é repositório reprova" 1 \
   "encontrados=0 analisados=0 links=0 quebrados=0" \
   python3 "$verificar" "$tmp/nao_repo"
 
+echo "== varrer_saida.py (SG-02, TM1 a TM4)"
+
+varre="$montagem/varrer_saida.py"
+vazio_epub="$tmp/vazio.epub"
+python3 -c 'import sys, zipfile; zipfile.ZipFile(sys.argv[1], "w").close()' "$vazio_epub"
+
+printf '<html><body><p>a %s b</p></body></html>\n' "$trav" > "$tmp/tm1.html"
+afirma "TM1 varrer: travessao no meio do paragrafo reprova" 1 \
+  "travessao fora de inicio de fala na saida" \
+  python3 -I "$varre" "$tmp/tm1.html" "$vazio_epub"
+
+printf '<p>%s Oi</p>\n<p class="x">\n%s Oi</p>\n' "$trav" "$trav" > "$tmp/tm2.html"
+afirma "TM2 varrer: fala em paragrafo aceita" 0 \
+  "[saida] encontrados=1" \
+  python3 -I "$varre" "$tmp/tm2.html" "$vazio_epub"
+
+printf '<img alt="a %s b">\n' "$trav" > "$tmp/tm3.html"
+afirma "TM3 varrer: travessao em atributo reprova" 1 \
+  "travessao fora de inicio de fala na saida" \
+  python3 -I "$varre" "$tmp/tm3.html" "$vazio_epub"
+
+mkdir -p "$tmp/tm4" && printf 'Ele respondeu que sim, e\n#hashtag\n%s Oi.\n' "$trav" > "$tmp/tm4/c01.md"
+pandoc -f markdown -t epub3 -o "$tmp/tm4.epub" "$tmp/tm4/c01.md" >/dev/null 2>&1
+printf '<html></html>\n' > "$tmp/tm4.html"
+afirma "TM4 varrer: epub do pandoc com hashtag reprova" 1 \
+  "travessao fora de inicio de fala na saida" \
+  python3 -I "$varre" "$tmp/tm4.html" "$tmp/tm4.epub"
+
+echo "== montar.sh (SG-02, TM5 e TM6)"
+
+saida_dir="$(git -C "$montagem" rev-parse --show-toplevel)/saida"
+rm -rf "$tmp/amostra-m5" && cp -R "$montagem/amostra" "$tmp/amostra-m5" && \
+  printf '\nFaixa 1%s2.\n' "$(printf '\342\200\223')" >> "$tmp/amostra-m5/texto/c01.md"
+saida_m5=$(bash "$montagem/montar.sh" "$tmp/amostra-m5" 2>&1); rc_m5=$?
+total=$((total + 1))
+if [ "$rc_m5" -ne 0 ] && printf '%s\n' "$saida_m5" | grep -qF -- "travessao fora de inicio de fala na saida"; then
+  echo "OK     TM5 montar: travessao gerado pelo pandoc reprova (rc=$rc_m5)"
+else
+  echo "FALHA  TM5 montar: travessao gerado pelo pandoc reprova (rc=$rc_m5)"
+  falhas=$((falhas + 1))
+fi
+rm -f "$saida_dir/amostra-m5.html" "$saida_dir/amostra-m5.epub"
+
+rm -rf "$tmp/amostra-m6" && cp -R "$montagem/amostra" "$tmp/amostra-m6"
+afirma "TM6 montar: amostra intacta monta" 0 "ok:" \
+  bash "$montagem/montar.sh" "$tmp/amostra-m6"
+rm -f "$saida_dir/amostra-m6.html" "$saida_dir/amostra-m6.epub"
+
 echo
 echo "casos=$total falhas=$falhas"
 if [ "$total" -eq 0 ] || [ "$falhas" -ne 0 ]; then

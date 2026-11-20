@@ -2,7 +2,7 @@
 # Copia privada diaria do repositorio por git bundle (TE-03, L-24 emenda 14/11/2026).
 #
 # Uso:
-#   bundle-diario.sh                          cria, verifica e rotaciona (mantem 7)
+#   BACKUPS_BASE=<pasta> bundle-diario.sh     cria, verifica e rotaciona (mantem 7)
 #   bundle-diario.sh --verificar <arquivo>    so verifica o bundle; sai 0 (integro) ou 1 (falha)
 #
 # Verificacao: git bundle verify + clone bare + git fsck --full. O verify sozinho
@@ -13,7 +13,8 @@ shopt -s nullglob
 export LC_ALL=C
 
 MANTER=7
-BACKUPS_BASE="$HOME/backups-git"
+# Pasta-base das copias: vem do ambiente, definida fora do repositorio (unidade do agendador).
+BACKUPS_BASE="${BACKUPS_BASE:-}"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
@@ -23,8 +24,6 @@ if [[ ! "$NOME" =~ ^[A-Za-z0-9._-]+$ ]]; then
   echo "FALHA: nome do repositorio fora do padrao seguro: $NOME" >&2
   exit 1
 fi
-
-DEST="$BACKUPS_BASE/$NOME"
 
 verificar_bundle() {
   local arq="$1" base tmp rc=0
@@ -62,6 +61,15 @@ if [[ "${1:-}" == "--verificar" ]]; then
   fi
   exit 1
 fi
+
+if [[ -z "$BACKUPS_BASE" || "$BACKUPS_BASE" != /* || ! -d "$BACKUPS_BASE" ]]; then
+  echo "FALHA: BACKUPS_BASE precisa ser o caminho absoluto de uma pasta existente, definido fora do repositorio" >&2
+  exit 1
+fi
+case "$(readlink -f -- "$BACKUPS_BASE")/" in
+  "$REPO"/*) echo "FALHA: BACKUPS_BASE dentro do repositorio: $BACKUPS_BASE" >&2; exit 1 ;;
+esac
+DEST="$BACKUPS_BASE/$NOME"
 
 case "$DEST" in
   "$BACKUPS_BASE/$NOME") ;;

@@ -19,10 +19,22 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Portoes sem chave, julgados pelo portao da base
+        shell: sh
         env:
           BASE_PUSH: ${{ github.event.before }}
           BASE_PR: ${{ github.event.pull_request.base.sha }}
-        run: sh ferramentas/portoes/ci-bootstrap.sh
+          BASE_PADRAO: ${{ github.event.repository.default_branch }}
+          BOOTSTRAP_BLOB: 1283099e74cbe46d55116e5951ed5eb4fa305cf9
+          GIT_NO_REPLACE_OBJECTS: "1"
+        run: |
+          # inicio-verificacao (SG-02): nada do checkout roda antes desta conferencia
+          git rev-parse -q --verify HEAD >/dev/null || { echo "  FALHOU historico vazio: sem HEAD"; exit 1; }
+          b=$(git rev-parse -q --verify HEAD:ferramentas/portoes/ci-bootstrap.sh) || { echo "  FALHOU HEAD sem ci-bootstrap.sh"; exit 1; }
+          [ "$b" = "$BOOTSTRAP_BLOB" ] || { echo "  FALHOU ci-bootstrap.sh fora do hash fixado no workflow: $b"; exit 1; }
+          d=$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/var/tmp}}/boot.XXXXXX") || exit 1
+          git cat-file blob "$BOOTSTRAP_BLOB" > "$d/ci-bootstrap.sh" || exit 1
+          sh "$d/ci-bootstrap.sh"
+          # fim-verificacao
       - name: gitleaks
         uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7  # v2
         env:

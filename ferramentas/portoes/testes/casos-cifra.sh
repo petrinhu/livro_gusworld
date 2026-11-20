@@ -130,7 +130,7 @@ caso TB20 REPROVA $? "modo de arquivo proibido" "$SCR/saida.txt" "link simbolico
 
 # TB21: tag apontando para blob
 novo_repo tb21 && sha=$(printf 'Abertura.\n' | git hash-object -w --stdin) && git tag t-blob "$sha" && \
-    ci_aqui tb21 "$ZERO" "$SCR/ci-tb21.txt"; rc21=$?
+    ci_aqui tb21 "$(git rev-parse HEAD)" "$SCR/ci-tb21.txt"; rc21=$?
 caso TB21 REPROVA "$rc21" "aponta para objeto que nao e commit" "$SCR/ci-tb21.txt" "tag que aponta para blob"
 
 # TB22: refs/replace no envio

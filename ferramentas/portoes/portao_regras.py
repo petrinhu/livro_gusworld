@@ -28,8 +28,8 @@ FILTRO_EXIGIDO = (
 
 # Hashes de blob aprovados de arquivo de confianca (SG-02): mudar o arquivo muda o hash e exige novo aprovado.
 APROVADOS = {
-    ".github/workflows/sigilo.yml": ("66fccf3e2afd38038fdf2d858496c11e69aed4d9", "0fc73b5f413865d904f4a4e16e85db2552994c9f"),
-    "ferramentas/portoes/ci-bootstrap.sh": ("801b2522740b7d13e4a65ef669c4174681f88a09", "1283099e74cbe46d55116e5951ed5eb4fa305cf9"),
+    ".github/workflows/sigilo.yml": ("0fc73b5f413865d904f4a4e16e85db2552994c9f",),
+    "ferramentas/portoes/ci-bootstrap.sh": ("1283099e74cbe46d55116e5951ed5eb4fa305cf9",),
 }
 
 # Caminhos que ficam em claro (SG-02, OS 5.3). Esta lista e a unica autoridade: o portao nao consulta

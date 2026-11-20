@@ -94,20 +94,6 @@ blob_falso() { # TAMANHO ARQUIVO: cabecalho GITCRYPT, 12 bytes de nonce e TAMANH
     { printf '\000GITCRYPT\000'; printf '\001\002\003\004\005\006\007\010\011\012\013\014'; head -c "$1" /dev/zero | tr '\0' 'a'; } > "$2"
 }
 
-ci_simulado() { # NOME BASE SAIDA: clone sem chave do HEAD e ci (novo: ci-bootstrap; legado: portoes.py ci)
-    local cl="$SCR/$1-ci" rc
-    seguro "$SCR/$1" || return 1
-    rm -rf "$cl"
-    git clone -q "$SCR/$1" "$cl" 2>/dev/null || return 1
-    test ! -e "$cl/.git/git-crypt/keys/default" || return 1
-    if [ "$MODO" = novo ]; then
-        ( cd "$cl" && BASE_PUSH="$2" sh ferramentas/portoes/ci-bootstrap.sh ) > "$3" 2>&1; rc=$?
-    else
-        ( cd "$cl" && python3 ferramentas/portoes/portoes.py ci ) > "$3" 2>&1; rc=$?
-    fi
-    return $rc
-}
-
 ci_aqui() { # NOME BASE SAIDA: ci rodado no proprio repositorio, sem clone
     seguro "$SCR/$1" || return 1
     if [ "$MODO" = novo ]; then
@@ -126,4 +112,46 @@ remoto_novo() { # NOME: repositorio bare de scratch como origin
 empurra() { # NOME: push do ramo atual (main) para o origin de scratch; o pre-push passa pelo portao
     seguro "$SCR/$1" || return 1
     git -C "$SCR/$1" push -q origin main > "$SCR/saida-envia.txt" 2>&1
+}
+
+roda_bloco_yaml() { # CLONE BASE SAIDA: roda o bloco de verificacao do workflow do clone (SG-02)
+    local y="$1/.github/workflows/sigilo.yml" b
+    b=$(sed -n 's/^ *BOOTSTRAP_BLOB: *\([0-9a-f]\{40\}\) *$/\1/p' "$y")
+    sed -n '/# inicio-verificacao/,/# fim-verificacao/p' "$y" | sed 's/^          //' > "$1.bloco.sh" || return 1
+    ( cd "$1" && BASE_PUSH="$2" BASE_PR= BASE_PADRAO=main BOOTSTRAP_BLOB="$b" GIT_NO_REPLACE_OBJECTS=1 \
+        sh -e "$1.bloco.sh" ) > "$3" 2>&1
+}
+
+ci_no_clone() { # CLONE BASE SAIDA: bloco do workflow (novo) ou ci-bootstrap.sh (antes da Fase 5) ou portoes.py ci (legado)
+    if [ "$MODO" = novo ] && grep -q '# inicio-verificacao' "$1/.github/workflows/sigilo.yml"; then
+        roda_bloco_yaml "$1" "$2" "$3"
+    elif [ "$MODO" = novo ]; then
+        ( cd "$1" && BASE_PUSH="$2" BASE_PADRAO=main sh ferramentas/portoes/ci-bootstrap.sh ) > "$3" 2>&1
+    else
+        ( cd "$1" && python3 ferramentas/portoes/portoes.py ci ) > "$3" 2>&1
+    fi
+}
+
+ci_simulado() { # NOME BASE SAIDA: clone sem chave do HEAD e CI
+    local cl="$SCR/$1-ci"
+    seguro "$SCR/$1" || return 1
+    rm -rf "$cl" "$cl.bloco.sh"
+    git clone -q "$SCR/$1" "$cl" 2>/dev/null || return 1
+    test ! -e "$cl/.git/git-crypt/keys/default" || return 1
+    ci_no_clone "$cl" "$2" "$3"
+}
+
+ci_simulado_ramo() { # NOME RAMO BASE SAIDA: como ci_simulado, com RAMO em checkout no clone
+    local cl="$SCR/$1-ci"
+    seguro "$SCR/$1" || return 1
+    rm -rf "$cl" "$cl.bloco.sh"
+    git clone -q "$SCR/$1" "$cl" 2>/dev/null || return 1
+    test ! -e "$cl/.git/git-crypt/keys/default" || return 1
+    git -C "$cl" switch -q "$2" || return 1
+    ci_no_clone "$cl" "$3" "$4"
+}
+
+empurra_ramo() { # NOME RAMO: push do RAMO para o origin de scratch; o pre-push passa pelo portao
+    seguro "$SCR/$1" || return 1
+    git -C "$SCR/$1" push -q origin "$2" > "$SCR/saida-envia.txt" 2>&1
 }

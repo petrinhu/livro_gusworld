@@ -22,9 +22,9 @@ O portão que julga um commit é o do commit anterior, nunca o do próprio commi
 
 - **Commit local** (`pre-commit` e `commit-msg`): o portão é extraído do HEAD para uma pasta temporária e roda com `python3 -I`, que não importa módulos da pasta do projeto.
 - **Envio** (`pre-push`): o portão vem do commit que o remoto já tem, a base do envio. Se o remoto não tem commit, vem do HEAD.
-- **CI público** (`ci-bootstrap.sh`): a base é o pull request ou, na falta dele, o envio anterior. Sem base, o CI usa o HEAD e a saída mostra `[ci-origem] portao de proprio-commit`.
+- **CI público** (`ci-bootstrap.sh`): a base é o pull request ou, na falta dele, o envio anterior. Base zero ou vazia vira a ponta publicada do ramo padrão (`refs/remotes/origin/<ramo padrão>`). Se essa ponta não existir, o CI falha fechado: no CI, a base zero nunca vira o próprio HEAD. No envio (`pre-push`), o primeiro envio, sem `main` no remoto, é julgado pelo HEAD (ver "primeiro envio" nos resíduos abaixo).
 
-Arquivos de confiança são o workflow `.github/workflows/sigilo.yml`, todo arquivo de `.github/workflows/` e o `ferramentas/portoes/ci-bootstrap.sh`. Cada um precisa estar na lista de hashes aprovados (`APROVADOS`, em `portao_regras.py`).
+Arquivos de confiança são o workflow `.github/workflows/sigilo.yml`, todo arquivo de `.github/workflows/` e o `ferramentas/portoes/ci-bootstrap.sh`. Cada um precisa estar na lista de hashes aprovados (`APROVADOS`, em `portao_regras.py`). O workflow fixa o hash do bootstrap (`BOOTSTRAP_BLOB`) e confere esse hash antes de qualquer coisa do checkout: mudar o bootstrap pede mudar o workflow no mesmo commit.
 
 Mudar um arquivo de confiança pede dois passos:
 
@@ -53,7 +53,11 @@ Também são recusados:
 - submódulo e link simbólico;
 - nome de caminho com quebra de linha ou caractere de controle;
 - arquivo que não é UTF-8, salvo binário de tipo conhecido;
-- binário (imagem, fonte ou PDF) fora de caminho cifrado, ou acima de 50 MiB.
+- binário (imagem, fonte ou PDF) fora de caminho cifrado, ou acima de 50 MiB;
+- arquivo que não é `.md` dentro de pasta de texto (`livro-*/texto/` e `ferramentas/montagem/amostra/texto/`);
+- arquivo da amostra em claro acima de 8192 bytes (`ferramentas/montagem/amostra/texto/cNN.md`).
+
+Sem chave, o CI só vê o cabeçalho e o corpo cifrado. Um corpo cifrado é suspeito se começa com assinatura de formato (gzip, zip, bzip2, xz, zstd, 7z ou BOM); ou, de 12 a 23 bytes, se todo byte é imprimível; ou, de 24 bytes ou mais, se 80% ou mais dos bytes são imprimíveis; ou, de 64 bytes ou mais, se a fração de bytes de 0x80 para cima sai da faixa de 0,20 a 0,80; ou se tem menos da metade dos valores distintos esperados para bytes aleatórios. Os limiares foram fixados antes de medir, e o histórico real não dispara nenhuma regra. Essas regras estreitam a classe K3 (abaixo), não a fecham.
 
 ## Regras de travessão
 
@@ -87,21 +91,23 @@ A montagem tem o próprio autoteste, sem argumentos: `bash ferramentas/montagem/
 
 ## CI sem chave
 
-O workflow `.github/workflows/sigilo.yml` roda em `push` e em `pull_request`, com permissão só de leitura. Ele faz dois passos:
+O workflow `.github/workflows/sigilo.yml` roda em `push` e em `pull_request`, com permissão só de leitura. Antes de qualquer coisa do checkout, o passo confere o hash do bootstrap fixado no próprio workflow e roda o bootstrap a partir do banco de objetos. Ele faz dois passos:
 
 1. `sh ferramentas/portoes/ci-bootstrap.sh`: julga o histórico pelo portão da base. Confere cada blob fora da lista de caminhos em claro usando só o cabeçalho cifrado e uma heurística de texto legível. Reprova se a saída não trouxer as linhas de contagem exigidas.
 2. gitleaks, com a ação e a versão fixadas em SHA e sem artefato público.
+
+O veredito é lido duas vezes: a segunda leitura é a função `confere_saida`, em shell, no bootstrap fixado (CI) e no `confiavel.sh` (local). Ela reprova com linha `FALHOU` ou `ERRO`, contagem diferente de zero, linha repetida ou linha de contagem ausente. O portão é extraído só da subárvore `ferramentas/portoes`, sem atributos da raiz.
 
 O CI não tem chave. A conferência completa do conteúdo cifrado acontece no envio (`pre-push`), na máquina de quem tem a chave.
 
 ## Resíduos aceitos
 
-O líder aceitou os resíduos abaixo em 20/11/2026. Cada um traz o controle que o projeto adotou.
+O líder aceitou os riscos K1, K2 e K3 em 20/11/2026, às 03:42 (registro em `canon/decisoes/2026-11.md`). Cada um traz o controle que o projeto adotou.
 
-- **R1: arquivos de CI alterados no próprio envio.** Controles: os hashes aprovados são conferidos antes de cada envio, e `--no-verify` é proibido pela política do projeto.
-- **R2: mudança do portão em dois envios separados.** Controle: a sequência de dois passos descrita acima.
-- **R3: limite da conferência sem chave.** Controle: a conferência completa com chave, no envio.
-- **R4: primeiro envio sem base de comparação.** Controle: a verificação do SG-04, fora do repositório, sobre clone novo, antes do primeiro envio público.
+- **K1: arquivo de CI trocado no próprio envio.** O GitHub lê o workflow do commit enviado. Controles: envio feito da máquina com a chave, ganchos instalados, `--no-verify` proibido (L-25) e auditoria antes do envio.
+- **K2: portão trocado em envio anterior aceito.** Um envio troca o código do portão, e os seguintes são julgados pelo portão trocado. Controle: a sequência de dois passos descrita acima.
+- **K3: conteúdo codificado de propósito parece cifra.** Sem chave, um corpo de bytes aleatórios com cabeçalho falso pode passar pela heurística. Controle: a conferência completa com chave, no envio.
+- **Primeiro envio sem base de comparação (à parte das classes K1 a K3).** Sem `main` no remoto, o `pre-push` julga pelo HEAD. Controle: a verificação do SG-04, fora do repositório, sobre clone novo. O primeiro envio público só sai depois do SG-04 e de novo sim do líder (registro de 20/11/2026, 03:07, no mesmo arquivo).
 - **R5: texto em claro em caminho permitido.** Controle: a lista de caminhos em claro é fechada e só muda por commit visível no código do portão.
 - **R6: nomes e tamanhos de caminho visíveis.** Controle: nomes neutros, e a decisão de aceitar o tamanho tomada no SG-01.
 

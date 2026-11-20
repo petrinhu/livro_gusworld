@@ -141,7 +141,7 @@ def janelas(cauda):
     """Janelas de JANELA bytes; a ultima, se menor que CORPO_ESTATISTICO, junta-se a anterior (SG-02d)."""
     partes = [cauda[i:i + JANELA] for i in range(0, len(cauda), JANELA)]
     if len(partes) > 1 and len(partes[-1]) < CORPO_ESTATISTICO:
-        partes[-2] += partes.pop()
+        partes[-2:] = [partes[-2] + partes[-1]]
     return partes
 
 

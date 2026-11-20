@@ -8,17 +8,19 @@ AQUI=$(cd "$(dirname "$0")" && pwd) || exit 1
 . "$AQUI/confiavel.sh" || exit 1
 confere_instalacao pre-push "$AQUI" || exit 1
 PUB_ARQ=
-trap 'limpa_temporarios; [ -z "$PUB_ARQ" ] || rm -f "$PUB_ARQ"' EXIT
+CRU=
+trap 'limpa_temporarios; [ -z "$PUB_ARQ" ] || rm -f "$PUB_ARQ"; [ -z "$CRU" ] || rm -f "$CRU"' EXIT
 ENT=$(mktemp "${TMPDIR:-/var/tmp}/portoes-ent.XXXXXX") || exit 1
 cat > "$ENT" || exit 1
 PUB_ARQ=$(mktemp "${TMPDIR:-/var/tmp}/portoes-pub.XXXXXX") || exit 1
-if [ -z "$2" ] || ! git ls-remote --refs "$2" > "$PUB_ARQ.cru"; then
-    rm -f "$PUB_ARQ.cru"
+CRU=$(mktemp "${TMPDIR:-/var/tmp}/portoes-cru.XXXXXX") || exit 1
+if [ -z "$2" ] || ! git ls-remote --refs -- "$2" > "$CRU"; then
+    rm -f "$CRU"
     echo "  FALHOU remoto ilegivel: git ls-remote no endereco do envio"
     exit 1
 fi
-awk -F '\t' '$2 ~ /^refs\/(heads|tags)\//' "$PUB_ARQ.cru" > "$PUB_ARQ" || exit 1
-rm -f "$PUB_ARQ.cru"
+awk -F '\t' '$2 ~ /^refs\/(heads|tags)\//' "$CRU" > "$PUB_ARQ" || exit 1
+rm -f "$CRU"
 REV=HEAD
 if [ -s "$PUB_ARQ" ]; then
     PUB=$(awk -F '\t' '$2 == "refs/heads/main" {print $1}' "$PUB_ARQ")

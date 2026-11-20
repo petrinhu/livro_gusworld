@@ -50,3 +50,8 @@ caso TW7 REPROVA "$rc" "remoto ilegivel" "$SCR/saida-tw7.txt" "pre-push com ende
 ok=; novo_repo tw8 && ok=1
 if [ -n "$ok" ]; then ( cd "$SCR/tw8" && env -u PORTOES_PUBLICADOS python3 -I ferramentas/portoes/portoes.py envio < /dev/null ) > "$SCR/saida-tw8.txt" 2>&1; rc=$?; else rc=0; fi
 caso TW8 REPROVA "$rc" "lista do remoto ausente" "$SCR/saida-tw8.txt" "portao de envio sem a lista do remoto fecha"
+
+# TW9: endereco que comeca com -- nao vira opcao do git ls-remote (sem --, --upload-pack executaria um comando): o envio fecha e nada roda
+ok=; novo_repo tw9 && git init -q --bare "$SCR/tw9-semente.git" && git -C "$SCR/tw9" remote add origin "$SCR/tw9-semente.git" && ok=1
+if [ -n "$ok" ]; then ( cd "$SCR/tw9" && sh .git/portoes-ganchos/pre-push origin "--upload-pack=touch $SCR/tw9-marca" < /dev/null ) > "$SCR/saida-tw9.txt" 2>&1; rc=$?; [ ! -e "$SCR/tw9-marca" ] || rc=0; else rc=0; fi
+caso TW9 REPROVA "$rc" "remoto ilegivel" "$SCR/saida-tw9.txt" "endereco com -- nao vira opcao e nao executa comando"

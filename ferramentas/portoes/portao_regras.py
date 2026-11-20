@@ -80,6 +80,6 @@ OBJETO_MAX = 4096  # bytes do objeto commit ou tag inteiro: autor, cabecalhos e 
 
 # Soma do que sai em claro (SG-02e, CRITICO-1 e CRITICO-2 da re-SG-03c). Envio: so o que ainda nao saiu.
 # CI: tudo desde a LINHA_DE_BASE; sem ela no repositorio, o historico inteiro (falha fechada).
-LINHA_DE_BASE = "da09180873f135effe55b644f9caf57654ff8a41"  # historico ate aqui revisado e aceito
+LINHA_DE_BASE = "5f1bfc5eb8a14fe641e3df86efb6d0acdf9f78c4"  # historico ate aqui revisado e aceito
 TETO_ENVIO = {"claro": 393216, "amostra": 16384, "objetos": 32768}
 ORCAMENTO = {"claro": 524288, "amostra": 32768, "objetos": 65536}

@@ -7,6 +7,7 @@ from portao_cifra import (e_binario, e_excecao, falha_amostra, falha_caminho, fa
 from portao_git import (ErroGit, arvore, cat_file_filtrado_bruto, conteudos, falhou, git, git_tenta, imprime,
                         pares_do_historico, separa_filtrado, tamanhos)
 from portao_mensagem import cita_sessao, falha_assunto, falhas_mensagem, tem_travessao
+from portao_orcamento import falhas_orcamento
 from portao_regras import CABECALHO, MARCO, MENSAGEM_MAX, NOREPLY, OBJETO_MAX, TAMANHO_CABECALHO
 from portao_travessao import falha_travessao
 
@@ -187,12 +188,15 @@ def ci():
     ok_refs = imprime("ci-refs", n_ref, n_ref, falhas_ref)
     formato = ["--all", "--not", MARCO] if marco_existe() else ["--all"]
     n, falhas_commit, n_fmt, vistos, falhas_fmt = verifica_mensagens(["--all"], formato)
+    orc_blob, orc_obj = falhas_orcamento("ci", ["--all"], [], objetos_tag(None))
+    falhas_commit += orc_obj
     ok_commits = imprime("ci-commits", n, n, falhas_commit)
     ok_assuntos = imprime("ci-assuntos", n_fmt, vistos, falhas_fmt, vazia_ok=True)
     pares = pares_do_historico(["--all"])
     analisados, falhas_blob, _cifrados, corpos = confere_pares(pares)
     da_head = arvore("HEAD")
     falhas_blob += falhas_volume(da_head, tamanhos(sorted({s for s, _ in da_head})))
+    falhas_blob += orc_blob
     ok_blobs = imprime("ci-blobs", len(pares), analisados, falhas_blob)
     unicos = {}
     for sha, caminho, _modo in sorted(pares):
@@ -265,6 +269,8 @@ def envio(texto):
     if locais:
         formato = (locais + ["--not", *remotos, MARCO]) if marco_existe() else revs
         n, falhas_commit, n_fmt, vistos, falhas_fmt = verifica_mensagens(revs, formato)
+    orc_blob, orc_obj = falhas_orcamento("envio", locais, [*remotos, "--remotes"], objetos_tag(set(locais)))
+    falhas_commit += orc_obj
     ok_commits = imprime("envio-commits", n, n, falhas_commit, vazia_ok=True)
     ok_assuntos = imprime("envio-assuntos", n_fmt, vistos, falhas_fmt, vazia_ok=True)
     pares = pares_do_historico(revs) if locais else set()
@@ -273,6 +279,7 @@ def envio(texto):
     tam = tamanhos(sorted({s for pares_ponta in arvores for s, _ in pares_ponta}))
     for pares_ponta in arvores:
         falhas_blob += falhas_volume(pares_ponta, tam)
+    falhas_blob += orc_blob
     ok_blobs = imprime("envio-blobs", len(pares), analisados, falhas_blob, vazia_ok=True)
     da_arvore = set()
     for pares_ponta in arvores:

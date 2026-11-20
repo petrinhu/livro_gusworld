@@ -77,3 +77,9 @@ IMPRIMIVEIS = frozenset(range(0x20, 0x7F)) | {0x09, 0x0A, 0x0D}
 # Teto de mensagem e de objeto (SG-02d, C2): commit e tag sao publicos e nao cifrados.
 MENSAGEM_MAX = 2048  # bytes da mensagem de commit ou de tag
 OBJETO_MAX = 4096  # bytes do objeto commit ou tag inteiro: autor, cabecalhos e mensagem
+
+# Soma do que sai em claro (SG-02e, CRITICO-1 e CRITICO-2 da re-SG-03c). Envio: so o que ainda nao saiu.
+# CI: tudo desde a LINHA_DE_BASE; sem ela no repositorio, o historico inteiro (falha fechada).
+LINHA_DE_BASE = "da09180873f135effe55b644f9caf57654ff8a41"  # historico ate aqui revisado e aceito
+TETO_ENVIO = {"claro": 393216, "amostra": 16384, "objetos": 32768}
+ORCAMENTO = {"claro": 524288, "amostra": 32768, "objetos": 65536}

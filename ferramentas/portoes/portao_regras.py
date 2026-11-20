@@ -73,3 +73,7 @@ K_SIGMA = 7  # banda em desvios-padrao em torno do esperado de bytes aleatorios,
 FAIXA_ALTOS = (0.20, 0.80)
 LIMIAR_LEGIVEL = 0.80
 IMPRIMIVEIS = frozenset(range(0x20, 0x7F)) | {0x09, 0x0A, 0x0D}
+
+# Teto de mensagem e de objeto (SG-02d, C2): commit e tag sao publicos e nao cifrados.
+MENSAGEM_MAX = 2048  # bytes da mensagem de commit ou de tag
+OBJETO_MAX = 4096  # bytes do objeto commit ou tag inteiro: autor, cabecalhos e mensagem

@@ -1,12 +1,13 @@
 """Portao de historico (SG-02): modo ci (historico inteiro, sem chave) e modo envio (pontas do pre-push)."""
 import os
+import re
 
 from portao_cifra import (e_binario, e_excecao, falha_amostra, falha_caminho, falha_claro, falha_teto, falhas_confianca,
                           falhas_volume, heuristica, modo_falha)
 from portao_git import (ErroGit, arvore, cat_file_filtrado_bruto, conteudos, falhou, git, git_tenta, imprime,
                         pares_do_historico, separa_filtrado, tamanhos)
 from portao_mensagem import cita_sessao, falha_assunto, falhas_mensagem, tem_travessao
-from portao_regras import CABECALHO, MARCO, NOREPLY, TAMANHO_CABECALHO
+from portao_regras import CABECALHO, MARCO, MENSAGEM_MAX, NOREPLY, OBJETO_MAX, TAMANHO_CABECALHO
 from portao_travessao import falha_travessao
 
 
@@ -20,23 +21,24 @@ def marco_existe():
 
 
 def verifica_mensagens(revs, revs_formato):
-    """Autor, committer, sessao, comentario e travessao de cada commit de revs; formato do assunto so nos
-    commits de revs_formato (o historico ate o MARCO fica isento, D5). Dois processos git no total.
+    """Autor, committer, sessao, comentario, travessao, teto da mensagem e do objeto de cada commit de revs;
+    formato do assunto so nos commits de revs_formato (o historico ate o MARCO fica isento, D5). Tres processos
+    git no total.
 
     Devolve (n, falhas, n_formato, analisados_formato, falhas_formato).
     """
     falhas, falhas_fmt, n, analisados = [], [], 0, 0
     reg = git(["log", *revs, "--format=%H%x00%ae%x00%ce%x00%B%x1e"]).decode("utf-8")
     formato = set(git(["rev-list", *revs_formato]).decode("ascii").split())
-    for rec in reg.split("\x1e"):
-        rec = rec.strip("\n")
-        if not rec:
-            continue
+    registros = [rec.strip("\n").split("\x00", 3) for rec in reg.split("\x1e") if rec.strip("\n")]
+    tam = tamanhos(sorted({r[0] for r in registros}))
+    for h, ae, ce, corpo in registros:
         n += 1
-        h, ae, ce, corpo = rec.split("\x00", 3)
         rotulo = f"commit {h[:7]}"
         if ae != NOREPLY or ce != NOREPLY:
             falhas.append(f"{rotulo}: autor ou committer fora do noreply")
+        if tam[h] > OBJETO_MAX:
+            falhas.append(f"{rotulo}: objeto commit acima do teto de bytes")
         falhas.extend(f"{rotulo}: {f}" for f in falhas_mensagem(corpo, formato=False, gravada=True))
         if h in formato:
             analisados += 1
@@ -48,28 +50,62 @@ def verifica_mensagens(revs, revs_formato):
     return n, falhas, len(formato), analisados, falhas_fmt
 
 
+TAGGER = re.compile(r"<([^<>]*)>")
+
+
+def campos_tag(bruto):
+    """(tipo do alvo, e-mail do tagger, mensagem em bytes) de um objeto tag cru (SG-02d, A2)."""
+    cabecalho, _, mensagem = bruto.partition(b"\n\n")
+    tipo, mail = "", ""
+    for ln in cabecalho.decode("utf-8", "replace").split("\n"):
+        if ln.startswith("type "):
+            tipo = ln[5:]
+        elif ln.startswith("tagger "):
+            m = TAGGER.search(ln)
+            mail = m.group(1) if m else ""
+    return tipo, mail, mensagem
+
+
+def objetos_tag(alvos):
+    """Objetos tag a julgar (SG-02d, A2). alvos None (ci): toda ref de tag anotada. Envio: os objetos
+    enviados cujo tipo e tag, com ou sem ref local. Um processo git."""
+    if alvos is None:
+        saida = git(["for-each-ref", "refs/tags", "--format=%(objecttype) %(objectname)"])
+    elif alvos:
+        entrada = "".join(f"{o}\n" for o in sorted(alvos)).encode("ascii")
+        saida = git(["cat-file", "--batch-check=%(objecttype) %(objectname)"], entrada)
+    else:
+        return []
+    pares = [ln.split(" ") for ln in saida.decode("ascii").splitlines() if ln]
+    return sorted({h for t, h in pares if t == "tag"})
+
+
 def verifica_tags(alvos):
-    """Tags anotadas: tagger noreply, mensagem sem sessao e sem travessao (SG-02, S52). Um processo git.
+    """Tags anotadas, pelo objeto (SG-02, S52; SG-02d, A2): alvo direto commit (tag aninhada reprova), tagger
+    noreply, mensagem sem sessao, sem travessao e no teto, objeto no teto. Ate tres processos git.
 
     alvos: None julga todas (ci); conjunto de objetos enviados (envio). Devolve (n, falhas).
     """
-    saida = git(["for-each-ref", "refs/tags", "--format=%(objecttype)%00%(refname)%00%(objectname)%00"
-                 "%(taggeremail)%00%(contents)%00"]).decode("utf-8")
-    campos = saida.split("\x00")  # registros de 5 campos, cada um terminado em NUL
-    n, falhas = 0, []
-    for i in range(0, len(campos) - 1, 5):
-        tipo, ref, objeto, mail, conteudo = campos[i:i + 5]
-        if tipo != "tag" or (alvos is not None and objeto not in alvos):
-            continue
-        n += 1
-        nome = ref.removeprefix("refs/tags/")
-        if mail.strip("<>") != NOREPLY:
-            falhas.append(f"tag {nome}: tagger fora do noreply")
-        if cita_sessao(conteudo):
-            falhas.append(f"tag {nome}: cita sessao (Claude-Session)")
-        if tem_travessao(conteudo):
-            falhas.append(f"tag {nome}: travessao na mensagem")
-    return n, falhas
+    objetos = objetos_tag(alvos)
+    tam = tamanhos(objetos)
+    falhas = []
+    for h, bruto in zip(objetos, conteudos(objetos)):
+        tipo, mail, mensagem = campos_tag(bruto)
+        texto = mensagem.decode("utf-8", "replace")
+        rotulo = f"tag {h[:7]}"
+        if tipo != "commit":
+            falhas.append(f"{rotulo}: tag aninhada ou de alvo que nao e commit")
+        if mail != NOREPLY:
+            falhas.append(f"{rotulo}: tagger fora do noreply")
+        if cita_sessao(texto):
+            falhas.append(f"{rotulo}: cita sessao (Claude-Session)")
+        if tem_travessao(texto):
+            falhas.append(f"{rotulo}: travessao na mensagem")
+        if len(mensagem) > MENSAGEM_MAX:
+            falhas.append(f"{rotulo}: mensagem acima do teto de bytes")
+        if tam[h] > OBJETO_MAX:
+            falhas.append(f"{rotulo}: objeto tag acima do teto de bytes")
+    return len(objetos), falhas
 
 
 def refs_e_raso():

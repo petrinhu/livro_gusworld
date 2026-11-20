@@ -8,7 +8,7 @@ import re
 import unicodedata
 
 from portao_git import git_tenta, imprime
-from portao_regras import ASSUNTO, ASSUNTO_MAX, NOREPLY, SESSAO, TESOURA, TRAVESSOES
+from portao_regras import ASSUNTO, ASSUNTO_MAX, MENSAGEM_MAX, NOREPLY, SESSAO, TESOURA, TRAVESSOES
 
 MENSAGEM_ASSUNTO = "assunto fora de 'tipo(escopo)?: descricao (ID)' ou com mais de 72 caracteres"
 MENSAGEM_SESSAO_LOCAL = "linha de sessao (Claude-Session) proibida na mensagem"
@@ -17,6 +17,7 @@ MENSAGEM_TRAVESSAO = "travessao na mensagem"
 MENSAGEM_COMENTARIO = "mensagem comeca com linha de comentario"
 RODAPE = re.compile(r"Co-Authored-By: [^<>\n]+ <noreply@anthropic\.com>")
 MENSAGEM_RODAPE = "rodape fora do modelo 'Co-Authored-By: <modelo> <noreply@anthropic.com>'"
+MENSAGEM_TETO = "mensagem acima do teto de bytes"
 
 # Codigos de travessao de mensagem e entidades que os nomeiam: a tabela HTML5 da biblioteca padrao.
 _CODIGOS = frozenset(ord(c) for c in TRAVESSOES)
@@ -97,6 +98,12 @@ def falha_rodape(texto):
     return None
 
 
+def tamanho_mensagem(texto, gravada):
+    """Bytes da mensagem; no gancho local, sem as linhas de comentario que o git apaga (SG-02d, C2)."""
+    linhas = texto.split("\n") if gravada else [ln for ln in texto.split("\n") if not ln.startswith("#")]
+    return len("\n".join(linhas).encode("utf-8"))
+
+
 def falhas_mensagem(texto, formato, gravada=False):
     """Falhas da mensagem, sem devolver o texto dela (V11).
 
@@ -113,6 +120,8 @@ def falhas_mensagem(texto, formato, gravada=False):
         falhas.append(MENSAGEM_SESSAO_GRAVADA if gravada else MENSAGEM_SESSAO_LOCAL)
     if tem_travessao(texto):
         falhas.append(MENSAGEM_TRAVESSAO)
+    if tamanho_mensagem(texto, gravada) > MENSAGEM_MAX:
+        falhas.append(MENSAGEM_TETO)
     rodape = falha_rodape(texto)
     if rodape:
         falhas.append(rodape)

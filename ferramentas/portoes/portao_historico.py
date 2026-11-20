@@ -230,6 +230,29 @@ def revs_da_entrada(texto):
     return locais, remotos
 
 
+PUBLICADO = re.compile(r"[0-9a-f]{40}\trefs/(?:heads|tags)/\S+")
+
+
+def publicados():
+    """Pontas que o remoto ja tem, lidas pelo pre-push com git ls-remote (SG-02f), nunca de refs/remotes locais.
+
+    So entram as que existem aqui como commit (tag descascada ate o commit). Lista ausente ou linha fora do
+    formato: o envio fecha. Um processo git.
+    """
+    caminho = os.environ.get("PORTOES_PUBLICADOS", "")
+    if not caminho or not os.path.isfile(caminho):
+        raise ErroGit("lista do remoto ausente: o envio exige o pre-push instalado")
+    with open(caminho, encoding="ascii") as f:
+        linhas = sorted({ln for ln in f.read().splitlines() if ln})
+    if any(not PUBLICADO.fullmatch(ln) for ln in linhas):
+        raise ErroGit("linha inesperada na lista do remoto")
+    if not linhas:
+        return []
+    entrada = "".join(f"{ln[:40]}^{{commit}}\n" for ln in linhas).encode("ascii")
+    saida = git(["cat-file", "--batch-check=%(objectname)"], entrada).decode("ascii")
+    return sorted({ln for ln in saida.splitlines() if ln and " " not in ln})
+
+
 def envio_chave(cifrados):
     """Com a chave, todo blob cifrado do intervalo tem que decifrar (adulteracao reprova)."""
     chave = git(["rev-parse", "--git-path", "git-crypt/keys/default"]).decode("utf-8").strip()
@@ -269,7 +292,7 @@ def envio(texto):
     if locais:
         formato = (locais + ["--not", *remotos, MARCO]) if marco_existe() else revs
         n, falhas_commit, n_fmt, vistos, falhas_fmt = verifica_mensagens(revs, formato)
-    orc_blob, orc_obj = falhas_orcamento("envio", locais, [*remotos, "--remotes"], objetos_tag(set(locais)))
+    orc_blob, orc_obj = falhas_orcamento("envio", locais, [*remotos, *publicados()], objetos_tag(set(locais)))
     falhas_commit += orc_obj
     ok_commits = imprime("envio-commits", n, n, falhas_commit, vazia_ok=True)
     ok_assuntos = imprime("envio-assuntos", n_fmt, vistos, falhas_fmt, vazia_ok=True)

@@ -119,6 +119,6 @@ O líder aceitou os riscos K1, K2 e K3 em 20/11/2026, às 03:42 (registro em `ca
 - **Primeiro envio sem base de comparação (à parte das classes K1 a K3).** Sem `main` no remoto, o `pre-push` julga pelo HEAD. Controle: a verificação do SG-04, fora do repositório, sobre clone novo. O primeiro envio público só sai depois do SG-04 e de novo sim do líder (registro de 20/11/2026, 03:07, no mesmo arquivo).
 - **R5: texto em claro em caminho permitido.** Controle: a lista de caminhos em claro é fechada e só muda por commit visível no código do portão.
 - **R6: nomes e tamanhos de caminho visíveis.** Controle: nomes neutros, e a decisão de aceitar o tamanho tomada no SG-01.
-- **K4: texto curto que cabe na forma, em lugar público, dentro dos tetos.** Um trecho curto em arquivo de ferramenta, na amostra, em mensagem de commit ou de tag, inclusive enredo no assunto, passa pela forma e pelos tetos. Controle: os tetos acima e a revisão do diff. Estado: pendente de decisão do líder.
+- **K4: texto curto que cabe na forma, em lugar público, dentro dos tetos.** Um trecho curto em arquivo de ferramenta, na amostra, em mensagem de commit ou de tag, inclusive enredo no assunto, passa pela forma e pelos tetos. Risco residual aceito pelo líder em 20/11/2026 (registro de decisões do projeto). Controles: os tetos acima, a conferência completa com chave no envio, a proibição de pular os ganchos (`--no-verify`, L-25) e a auditoria antes do primeiro envio.
 
 Diretório pai: [ferramentas](../LEIAME.md).

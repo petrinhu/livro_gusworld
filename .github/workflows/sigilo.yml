@@ -1,0 +1,26 @@
+# Portoes de sigilo do livro (SG-02), sem chave. O job confere o cabecalho cifrado de todo blob
+# do historico, o autor e o committer dos commits e a ausencia de sessao nas mensagens, e roda
+# o gitleaks. Nenhum segredo de cifra entra aqui; o log publico mostra so caminho, hash e contagem.
+name: sigilo
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  portoes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Portoes sem chave (cabecalho, autor, sessao)
+        run: python3 ferramentas/portoes/portoes.py ci
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7  # v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

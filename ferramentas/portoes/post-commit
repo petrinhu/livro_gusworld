@@ -1,0 +1,9 @@
+#!/bin/sh
+# Passagem ao hook global de mesmo nome (SG-02). Sem este arquivo, core.hooksPath local
+# deixaria de executar o hook global "post-commit".
+GLOBAL="${HOME:-/nonexistent}/.claude/githooks/post-commit"
+if [ -x "$GLOBAL" ]; then
+    "$GLOBAL" "$@"
+    exit $?
+fi
+exit 0

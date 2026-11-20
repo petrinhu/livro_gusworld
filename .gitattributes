@@ -4,3 +4,4 @@
 /README.md !filter !diff
 /LICENSE.md !filter !diff
 /ferramentas/** !filter !diff
+/.github/workflows/** !filter !diff

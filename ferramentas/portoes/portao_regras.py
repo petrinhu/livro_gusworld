@@ -3,11 +3,10 @@ import re
 
 NOREPLY = "238845971+petrinhu@users.noreply.github.com"
 CABECALHO = b"\x00GITCRYPT\x00"
-TRAVESSOES = ("\u2014", "\u2013")
-# Mensagem de commit e de tag: traco parecido com o travessao tambem conta (L-01 do projeto, emendada em
-# 20/11/2026). O sinal de menos (U+2212) fica fora. Os blobs seguem TRAVESSOES ate a Fase 7 (OS 6.7).
-TRAVESSOES_MENSAGEM = frozenset(("\u2014", "\u2013", "\u2015", "\u2012", "\u2e3a", "\u2e3b", "\ufe58",
-                                 "\ufe31", "\ufe32"))
+# Traco que conta como travessao (L-01 do projeto, ampliada em 20/11/2026, D6 opcao a). O sinal de menos
+# (U+2212) fica fora. Na fala, so o U+2014 e aceito, e so abrindo a fala (portao_travessao).
+TRAVESSOES = ("\u2014", "\u2013", "\u2015", "\u2012", "\u2e3a", "\u2e3b", "\ufe58", "\ufe31", "\ufe32")
+TRAVESSAO_FALA = "\u2014"
 FALA = re.compile(r"^(livro-[^/]+/texto/|ferramentas/montagem/amostra/texto/)")
 TIPOS = "feat|fix|refactor|chore|docs|test|perf|style|revert"
 # Lista fechada de prefixos de ID (SG-02, D5): de 1 a 6 IDs separados por ", ".

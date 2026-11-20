@@ -14,8 +14,9 @@ import zipfile
 
 sys.dont_write_bytecode = True
 
-TRAVESSOES = ("\u2014", "\u2013")
-TRAV = re.compile("[\u2014\u2013]")
+TRAVESSOES = ("\u2014", "\u2013", "\u2015", "\u2012", "\u2e3a", "\u2e3b", "\ufe58", "\ufe31", "\ufe32")
+TRAVESSAO_FALA = "\u2014"
+TRAV = re.compile("|".join(re.escape(t) for t in TRAVESSOES))
 ABRE_P = re.compile(r"<p(?:\s[^<>]*)?>\s*\Z")
 EXTENSOES = (".xhtml", ".html", ".htm", ".ncx", ".opf")
 _NOMES = sorted((k[:-1] for k, v in html.entities.html5.items() if k.endswith(";") and v in TRAVESSOES),
@@ -38,7 +39,8 @@ def linhas_com_falha(texto):
     texto = ENTIDADE.sub(_troca_entidade, texto)
     achados = []
     for m in TRAV.finditer(texto):
-        if not ABRE_P.search(texto[max(0, m.start() - 300):m.start()]):
+        abre_fala = m.group(0) == TRAVESSAO_FALA and ABRE_P.search(texto[max(0, m.start() - 300):m.start()])
+        if not abre_fala:
             achados.append(texto.count("\n", 0, m.start()) + 1)
     return achados
 

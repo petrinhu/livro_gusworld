@@ -22,7 +22,7 @@ chmod 755 "$HOME/.claude/githooks/pre-commit" "$HOME/.claude/githooks/commit-msg
 
 . "$TST/comum.sh"
 cd "$SCR" || exit 1
-for grupo in casos-atuais casos-confianca casos-cifra casos-mensagem casos-travessao; do
+for grupo in casos-atuais casos-confianca casos-cifra casos-mensagem casos-travessao casos-tracos; do
     . "$TST/$grupo.sh"
 done
 

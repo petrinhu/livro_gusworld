@@ -8,7 +8,7 @@ import re
 import unicodedata
 
 from portao_git import git_tenta, imprime
-from portao_regras import ASSUNTO, ASSUNTO_MAX, NOREPLY, SESSAO, TESOURA, TRAVESSOES_MENSAGEM
+from portao_regras import ASSUNTO, ASSUNTO_MAX, NOREPLY, SESSAO, TESOURA, TRAVESSOES
 
 MENSAGEM_ASSUNTO = "assunto fora de 'tipo(escopo)?: descricao (ID)' ou com mais de 72 caracteres"
 MENSAGEM_SESSAO_LOCAL = "linha de sessao (Claude-Session) proibida na mensagem"
@@ -17,7 +17,7 @@ MENSAGEM_TRAVESSAO = "travessao na mensagem"
 MENSAGEM_COMENTARIO = "mensagem comeca com linha de comentario"
 
 # Codigos de travessao de mensagem e entidades que os nomeiam: a tabela HTML5 da biblioteca padrao.
-_CODIGOS = frozenset(ord(c) for c in TRAVESSOES_MENSAGEM)
+_CODIGOS = frozenset(ord(c) for c in TRAVESSOES)
 _NOMES = sorted((k[:-1] for k, v in html.entities.html5.items()
                  if k.endswith(";") and len(v) == 1 and ord(v) in _CODIGOS), key=len, reverse=True)
 _ENTIDADE = re.compile(r"&(?:%s);|&#(?:[xX](?P<hex>[0-9a-fA-F]+)|(?P<dec>[0-9]+));"
@@ -50,7 +50,7 @@ def cita_sessao(texto):
 def tem_travessao(texto):
     """Travessao de mensagem: caractere da lista fechada ou entidade que o nomeia (checa a forma NFKC)."""
     t = unicodedata.normalize("NFKC", texto)
-    if any(c in TRAVESSOES_MENSAGEM for c in t):
+    if any(c in TRAVESSOES for c in t):
         return True
     for m in _ENTIDADE.finditer(t):
         if m.group("hex") is None and m.group("dec") is None:

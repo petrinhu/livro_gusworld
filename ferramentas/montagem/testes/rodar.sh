@@ -221,6 +221,16 @@ afirma "TM4 varrer: epub do pandoc com hashtag reprova" 1 \
   "travessao fora de inicio de fala na saida" \
   python3 -I "$varre" "$tmp/tm4.html" "$tmp/tm4.epub"
 
+printf '<p>%s Oi</p>\n' "$(printf '\342\200\223')" > "$tmp/tm7.html"
+afirma "TM7 varrer: meio-travessao abrindo fala na saida nao e aceito" 1 \
+  "travessao fora de inicio de fala na saida" \
+  python3 -I "$varre" "$tmp/tm7.html" "$vazio_epub"
+
+printf '<p>Ele disse %s oi.</p>\n' "$(printf '\342\200\225')" > "$tmp/tm8.html"
+afirma "TM8 varrer: barra horizontal no meio do paragrafo reprova" 1 \
+  "travessao fora de inicio de fala na saida" \
+  python3 -I "$varre" "$tmp/tm8.html" "$vazio_epub"
+
 echo "== montar.sh (SG-02, TM5 e TM6)"
 
 saida_dir="$(git -C "$montagem" rev-parse --show-toplevel)/saida"

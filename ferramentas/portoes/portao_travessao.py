@@ -8,7 +8,7 @@ import re
 
 from portao_cifra import e_binario, falha_teto
 from portao_git import conteudos_filtrados
-from portao_regras import CABECALHO, FALA, TRAVESSOES
+from portao_regras import CABECALHO, FALA, TRAVESSAO_FALA, TRAVESSOES
 
 # Nome HTML5 (sem ponto e virgula) de cada travessao: lido da tabela da biblioteca padrao, nunca escrito aqui.
 _NOMES = sorted((k[:-1] for k, v in html.entities.html5.items() if k.endswith(";") and v in TRAVESSOES),
@@ -53,7 +53,7 @@ def travessao_fora_de_lugar(texto, fala_permitida):
             if ch not in TRAVESSOES:
                 continue
             inicio = linha[:pos].strip(" \t") == ""
-            if not (fala_permitida and inicio and _paragrafo(linhas, n)):
+            if not (fala_permitida and ch == TRAVESSAO_FALA and inicio and _paragrafo(linhas, n)):
                 return n + 1
     return 0
 

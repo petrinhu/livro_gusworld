@@ -230,27 +230,47 @@ def revs_da_entrada(texto):
     return locais, remotos
 
 
-PUBLICADO = re.compile(r"[0-9a-f]{40}\trefs/(?:heads|tags)/\S+")
+PUBLICADO = re.compile(rb"([0-9a-f]{40})\t(refs/(?:heads|tags)/\S+)")
 
 
-def publicados():
-    """Pontas que o remoto ja tem, lidas pelo pre-push com git ls-remote (SG-02f), nunca de refs/remotes locais.
+def lista_publicada():
+    """Ramos e tags que o remoto informa, lidos pelo pre-push com git ls-remote (SG-02f), nunca de refs/remotes.
 
-    So entram as que existem aqui como commit (tag descascada ate o commit). Lista ausente ou linha fora do
-    formato: o envio fecha. Um processo git.
+    Lida em bytes: nome de ref fora do ASCII nao trava o envio (SG-02g). Lista ausente ou linha fora do
+    formato: o envio fecha.
     """
     caminho = os.environ.get("PORTOES_PUBLICADOS", "")
     if not caminho or not os.path.isfile(caminho):
         raise ErroGit("lista do remoto ausente: o envio exige o pre-push instalado")
-    with open(caminho, encoding="ascii") as f:
-        linhas = sorted({ln for ln in f.read().splitlines() if ln})
-    if any(not PUBLICADO.fullmatch(ln) for ln in linhas):
+    with open(caminho, "rb") as f:
+        achados = [PUBLICADO.fullmatch(ln) for ln in f.read().splitlines() if ln]
+    if not all(achados):
         raise ErroGit("linha inesperada na lista do remoto")
-    if not linhas:
+    return {m.group(2): m.group(1).decode("ascii") for m in achados}
+
+
+def publicados(lista):
+    """Pontas da lista que existem aqui como commit (tag descascada ate o commit). Um processo git."""
+    if not lista:
         return []
-    entrada = "".join(f"{ln[:40]}^{{commit}}\n" for ln in linhas).encode("ascii")
+    entrada = "".join(f"{sha}^{{commit}}\n" for sha in sorted(set(lista.values()))).encode("ascii")
     saida = git(["cat-file", "--batch-check=%(objectname)"], entrada).decode("ascii")
     return sorted({ln for ln in saida.splitlines() if ln and " " not in ln})
+
+
+def falhas_entrada(texto, lista):
+    """Envio que apaga o main fecha; o sha remoto de cada ramo ou tag tem que bater com a lista (SG-02g)."""
+    falhas = []
+    for partes in (ln.split() for ln in texto.splitlines()):
+        if len(partes) != 4:
+            continue
+        _ref_l, sha_l, ref_r, sha_r = partes
+        if ref_r == "refs/heads/main" and eh_zero(sha_l):
+            falhas.append("envio apaga refs/heads/main")
+        chave = ref_r.encode("utf-8", "surrogateescape")
+        if PUBLICADO.fullmatch(b"0" * 40 + b"\t" + chave) and lista.get(chave) != (None if eh_zero(sha_r) else sha_r):
+            falhas.append(f"entrada do git diverge da lista do remoto: {ref_r}")
+    return falhas
 
 
 def envio_chave(cifrados):
@@ -285,14 +305,16 @@ def envio_chave(cifrados):
 def envio(texto):
     """Modo pre-push: refs, checagens de ci sobre as pontas enviadas, confianca na arvore, depois a chave."""
     locais, remotos = revs_da_entrada(texto)
+    lista = lista_publicada()
     n_ref, falhas_ref = refs_e_raso()
+    falhas_ref += falhas_entrada(texto, lista)
     ok_refs = imprime("envio-refs", n_ref, n_ref, falhas_ref)
     revs = locais + (["--not", *remotos] if remotos else [])
     n, falhas_commit, n_fmt, vistos, falhas_fmt = 0, [], 0, 0, []
     if locais:
         formato = (locais + ["--not", *remotos, MARCO]) if marco_existe() else revs
         n, falhas_commit, n_fmt, vistos, falhas_fmt = verifica_mensagens(revs, formato)
-    orc_blob, orc_obj = falhas_orcamento("envio", locais, [*remotos, *publicados()], objetos_tag(set(locais)))
+    orc_blob, orc_obj = falhas_orcamento("envio", locais, [*remotos, *publicados(lista)], objetos_tag(set(locais)))
     falhas_commit += orc_obj
     ok_commits = imprime("envio-commits", n, n, falhas_commit, vazia_ok=True)
     ok_assuntos = imprime("envio-assuntos", n_fmt, vistos, falhas_fmt, vazia_ok=True)

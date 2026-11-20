@@ -8,6 +8,7 @@ import zlib
 
 CABECALHO = b"\x00GITCRYPT\x00" + bytes(range(1, 13))
 TEXTO = ("Abertura do capitulo. Oi, disse ele. " * 40).encode("ascii")
+LONGO = TEXTO * 60  # 88800 bytes de texto generico, para os corpos longos (SG-02d)
 LOTE = (12, 23, 24, 63, 64, 188, 4096)
 
 
@@ -34,6 +35,13 @@ def cauda(tipo, n):
         return b"a" * 79 + b"\x01" * 21
     if tipo == "xor80":
         return bytes(b ^ 0x80 for b in TEXTO[:n])
+    if tipo == "prefixo":
+        return aleatorio(65536) + LONGO[:n]
+    if tipo == "ruido79":
+        return bytes(LONGO[i] if i % 100 < 79 else 0x80 + (i % 128) for i in range(n))
+    if tipo == "diluido05":
+        ruido = aleatorio(n)
+        return bytes(LONGO[i] if i % 20 == 0 else ruido[i] for i in range(n))
     if tipo == "aleatorio":
         return aleatorio(n)
     raise SystemExit(f"tipo desconhecido: {tipo}")

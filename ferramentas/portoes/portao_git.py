@@ -2,7 +2,12 @@
 
 Um processo git por chamada, nunca um por arquivo ou por commit (L-11).
 """
+import os
 import subprocess
+
+# Ambiente limpo: sem objetos de substituicao e sem fonte de atributos alternativa (SG-02).
+AMBIENTE = {k: v for k, v in os.environ.items() if k != "GIT_ATTR_SOURCE"}
+AMBIENTE["GIT_NO_REPLACE_OBJECTS"] = "1"
 
 
 class ErroGit(Exception):
@@ -10,14 +15,14 @@ class ErroGit(Exception):
 
 
 def git(args, entrada=b""):
-    r = subprocess.run(["git", *args], input=entrada, capture_output=True)
+    r = subprocess.run(["git", *args], input=entrada, capture_output=True, env=AMBIENTE)
     if r.returncode != 0:
         raise ErroGit(f"git {args[0]} saiu com codigo {r.returncode}")
     return r.stdout
 
 
 def git_tenta(args):
-    r = subprocess.run(["git", *args], capture_output=True)
+    r = subprocess.run(["git", *args], capture_output=True, env=AMBIENTE)
     return r.returncode, r.stdout
 
 
@@ -52,6 +57,14 @@ def conteudos_filtrados(pares):
     return separa_batch(raw, len(pares))
 
 
+def cat_file_filtrado_bruto(pares):
+    """Como conteudos_filtrados, mas devolve (rc, saida, stderr) sem falhar: o chamador decide o veredito."""
+    entrada = "".join(f"{sha} {c}\n" for sha, c in pares).encode("utf-8")
+    r = subprocess.run(["git", "cat-file", "--batch", "--filters"], input=entrada,
+                       capture_output=True, env=AMBIENTE)
+    return r.returncode, r.stdout, r.stderr
+
+
 def atributos(caminhos):
     """Atributo filter de cada caminho, lido do indice, em um unico processo git."""
     unicos = sorted(set(caminhos))
@@ -79,10 +92,11 @@ def indice():
     return itens
 
 
-def imprime(nome, encontrados, analisados, falhas):
+def imprime(nome, encontrados, analisados, falhas, vazia_ok=False):
+    """Linha de contagem e falhas. Zero so vale quando vazia_ok (envio sem commit novo, sem blob)."""
     print(f"[{nome}] encontrados={encontrados} analisados={analisados} falharam={len(falhas)}")
-    if encontrados == 0:
+    if encontrados == 0 and not vazia_ok:
         print("  FALHOU varredura vazia: piso de verificacao zero (L-36)")
     for f in falhas:
         print(f"  FALHOU {f}")
-    return encontrados > 0 and analisados == encontrados and not falhas
+    return (encontrados > 0 or vazia_ok) and analisados == encontrados and not falhas

@@ -17,3 +17,9 @@ FILTRO_EXIGIDO = (
     ("filter.git-crypt.smudge", None),
     ("filter.git-crypt.required", "true"),
 )
+
+# Hashes de blob aprovados de arquivo de confianca (SG-02): mudar o arquivo muda o hash e exige novo aprovado.
+APROVADOS = {
+    ".github/workflows/sigilo.yml": ("66fccf3e2afd38038fdf2d858496c11e69aed4d9",),
+    "ferramentas/portoes/ci-bootstrap.sh": ("801b2522740b7d13e4a65ef669c4174681f88a09",),
+}

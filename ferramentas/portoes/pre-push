@@ -1,9 +1,30 @@
 #!/bin/sh
-# Passagem ao hook global de mesmo nome (SG-02). Sem este arquivo, core.hooksPath local
-# deixaria de executar o hook global "pre-push".
+# Portao de pre-push do livro (SG-02). A entrada do git e lida uma vez, salva em arquivo e entregue
+# ao portao e ao hook global de mesmo nome. O portao julgado e o da base do envio (remote sha,
+# primeira ponta nao zero que exista localmente) ou, sem base, o HEAD.
+AQUI=$(cd "$(dirname "$0")" && pwd) || exit 1
+. "$AQUI/confiavel.sh" || exit 1
+confere_instalacao pre-push "$AQUI" || exit 1
+ENT=$(mktemp "${TMPDIR:-/var/tmp}/portoes-ent.XXXXXX") || exit 1
+cat > "$ENT" || exit 1
+REV=HEAD
+while read -r _ref_l _sha_l _ref_r sha_r; do
+    case "$sha_r" in
+        ""|*[!0]*) ;;
+        *)
+            if git cat-file -e "$sha_r^{commit}" 2>/dev/null; then
+                REV=$sha_r
+                break
+            fi
+            ;;
+    esac
+done < "$ENT"
+extrai_portao "$REV" || exit 1
+python3 -I "$PORTAO_DIR/portoes.py" envio < "$ENT" || exit 1
 GLOBAL="${HOME:-/nonexistent}/.claude/githooks/pre-push"
 if [ -x "$GLOBAL" ]; then
-    "$GLOBAL" "$@"
-    exit $?
+    "$GLOBAL" "$@" < "$ENT"
+    rc=$?
+    [ "$rc" -eq 0 ] || exit "$rc"
 fi
 exit 0

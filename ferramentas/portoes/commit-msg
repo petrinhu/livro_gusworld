@@ -1,8 +1,11 @@
 #!/bin/sh
-# Portao de commit-msg do livro (SG-02). Roda o portao deste repositorio e depois
-# o hook global de mesmo nome, porque core.hooksPath local sombreia o global.
-DIR=$(cd "$(dirname "$0")" && pwd) || exit 1
-python3 "$DIR/portoes.py" commit-msg "$1" || exit 1
+# Portao de commit-msg do livro (SG-02). Julga a mensagem pelo portao do HEAD (ver confiavel.sh).
+# Depois roda o hook global de mesmo nome, porque core.hooksPath local sombreia o global.
+AQUI=$(cd "$(dirname "$0")" && pwd) || exit 1
+. "$AQUI/confiavel.sh" || exit 1
+confere_instalacao commit-msg "$AQUI" || exit 1
+extrai_portao HEAD || exit 1
+python3 -I "$PORTAO_DIR/portoes.py" commit-msg "$1" || exit 1
 GLOBAL="${HOME:-/nonexistent}/.claude/githooks/commit-msg"
 if [ -x "$GLOBAL" ]; then
     "$GLOBAL" "$@"

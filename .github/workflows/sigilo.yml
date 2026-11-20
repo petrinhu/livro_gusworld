@@ -1,6 +1,6 @@
-# Portoes de sigilo do livro (SG-02), sem chave. O job confere o cabecalho cifrado de todo blob
-# do historico, o autor e o committer dos commits e a ausencia de sessao nas mensagens, e roda
-# o gitleaks. Nenhum segredo de cifra entra aqui; o log publico mostra so caminho, hash e contagem.
+# Portoes de sigilo do livro (SG-02), sem chave. O job julga o HEAD pelo portao da base (commit anterior),
+# extraido do proprio repositorio, e roda o gitleaks. Nenhum segredo de cifra entra aqui; o log publico
+# mostra so caminho, hash e contagem.
 name: sigilo
 
 on:
@@ -18,9 +18,15 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Portoes sem chave (cabecalho, autor, sessao)
-        run: python3 ferramentas/portoes/portoes.py ci
+      - name: Portoes sem chave, julgados pelo portao da base
+        env:
+          BASE_PUSH: ${{ github.event.before }}
+          BASE_PR: ${{ github.event.pull_request.base.sha }}
+        run: sh ferramentas/portoes/ci-bootstrap.sh
       - name: gitleaks
         uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7  # v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_VERSION: "8.30.1"
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
+          GITLEAKS_ENABLE_SUMMARY: "false"

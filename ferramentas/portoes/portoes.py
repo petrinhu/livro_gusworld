@@ -9,6 +9,8 @@ Modos:
   assuntos            mesma regra de commit-msg, em lote, lendo um assunto por linha de stdin.
   ci                  sem chave: todo blob do historico fora da excecao tem cabecalho cifrado;
                       todo commit tem autor e committer noreply e nenhum cita sessao.
+  envio               pre-push: as mesmas checagens do ci nas pontas enviadas (entrada padrao do git); com
+                      chave, todo blob cifrado do intervalo tem que decifrar.
 
 Saida: encontrados/analisados/falharam por verificacao, com caminho, hash ou numero de linha.
 Nunca imprime conteudo do livro nem o texto de uma mensagem (V11).
@@ -25,7 +27,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))  # append: a bibliot
 
 from portao_cifra import portao_cifra  # noqa: E402
 from portao_git import ErroGit, imprime, indice  # noqa: E402
-from portao_historico import ci  # noqa: E402
+from portao_historico import ci, envio  # noqa: E402
 from portao_mensagem import assuntos, commit_msg, portao_autor  # noqa: E402
 from portao_travessao import portao_travessao  # noqa: E402
 
@@ -51,8 +53,10 @@ def main(argv):
             ok = assuntos(sys.stdin)
         elif modo == "ci" and len(argv) == 2:
             ok = ci()
+        elif modo == "envio" and len(argv) == 2:
+            ok = envio(sys.stdin.read())
         else:
-            print("uso: portoes.py pre-commit | commit-msg ARQUIVO | assuntos | ci", file=sys.stderr)
+            print("uso: portoes.py pre-commit | commit-msg ARQUIVO | assuntos | ci | envio", file=sys.stderr)
             return 2
     except (ErroGit, OSError, ValueError, UnicodeDecodeError) as e:
         print(f"ERRO (portao fecha por seguranca): {e}")

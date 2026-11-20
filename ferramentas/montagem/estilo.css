@@ -1,0 +1,53 @@
+/* estilo.css (TE-01): folha de estilo da montagem em HTML5 e ePub 3.
+ * A hifenizacao depende do idioma: o Pandoc grava lang="pt-BR" (metadados.yaml),
+ * e o seletor :lang(pt) abaixo so age sobre esse texto. */
+
+html {
+  font-size: 100%;
+}
+
+body {
+  font-family: Georgia, "Times New Roman", serif;
+  line-height: 1.55;
+  margin: 0 auto;
+  max-width: 40em;
+  padding: 1em;
+  text-align: left;
+}
+
+p {
+  margin: 0 0 0.9em 0;
+  orphans: 2;
+  widows: 2;
+  text-align: justify;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+
+:lang(pt) {
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+
+h1 {
+  font-size: 1.6em;
+  margin: 1.5em 0 0.8em 0;
+  page-break-before: always;
+  hyphens: manual;
+}
+
+h2 {
+  font-size: 1.25em;
+  margin: 1.2em 0 0.6em 0;
+  hyphens: manual;
+}
+
+nav#TOC ul,
+nav ol {
+  list-style-type: none;
+  padding-left: 1em;
+}
+
+a {
+  color: inherit;
+}

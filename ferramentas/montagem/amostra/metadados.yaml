@@ -1,0 +1,8 @@
+title: "Amostra de montagem"
+author: "Autor de amostra"
+lang: pt-BR
+date: "2026-11-19"
+rights: "Texto de amostra criado para testar a montagem. Sem obra real."
+identifier:
+  - text: "urn:amostra-montagem:0001"
+    scheme: "URN"

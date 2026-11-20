@@ -21,7 +21,7 @@ Reinstale sempre que um destes arquivos mudar: `pre-commit`, `commit-msg`, `pre-
 O portão que julga um commit é o do commit anterior, nunca o do próprio commit. Assim, um commit não aprova a própria mudança de regra. Quando um commit muda o portão, a regra nova vale a partir do commit seguinte.
 
 - **Commit local** (`pre-commit` e `commit-msg`): o portão é extraído do HEAD para uma pasta temporária e roda com `python3 -I`, que não importa módulos da pasta do projeto.
-- **Envio** (`pre-push`): o portão vem do commit que o remoto já tem, a base do envio. Se o remoto não tem commit, vem do HEAD.
+- **Envio** (`pre-push`): o portão vem do `main` que o próprio remoto informa (`git ls-remote` no endereço do envio), nunca de `refs/remotes` local. Remoto vazio (primeiro envio): vem do HEAD. Remoto com refs e sem `main`, ou `main` publicado que não existe aqui: o envio fecha (rode `git fetch` antes).
 - **CI público** (`ci-bootstrap.sh`): a base é o pull request ou, na falta dele, o envio anterior. Base zero ou vazia vira a ponta publicada do ramo padrão (`refs/remotes/origin/<ramo padrão>`). Se essa ponta não existir, o CI falha fechado: no CI, a base zero nunca vira o próprio HEAD. No envio (`pre-push`), o primeiro envio, sem `main` no remoto, é julgado pelo HEAD (ver "primeiro envio" nos resíduos abaixo).
 
 Arquivos de confiança são o workflow `.github/workflows/sigilo.yml`, todo arquivo de `.github/workflows/` e o `ferramentas/portoes/ci-bootstrap.sh`. Cada um precisa estar na lista de hashes aprovados (`APROVADOS`, em `portao_regras.py`). O workflow fixa o hash do bootstrap (`BOOTSTRAP_BLOB`) e confere esse hash antes de qualquer coisa do checkout: mudar o bootstrap pede mudar o workflow no mesmo commit.
@@ -70,11 +70,12 @@ Sem chave, o CI só vê o cabeçalho e o corpo cifrado. Um corpo cifrado é susp
 
 ## Soma do que sai em claro
 
-- Envio: o `pre-push` soma o que o envio ainda não publicou, fora do que o remoto já tem, de toda ref remota conhecida e do histórico até a `LINHA_DE_BASE` (`portao_regras.py`): blobs em claro únicos até 393216 bytes, amostra até 16384 e objetos commit e tag até 32768. A linha `[envio-orcamento]` mostra a conta.
+- Envio: o `pre-push` soma o que o envio ainda não publicou, fora dos ramos e tags que o próprio remoto informa (`git ls-remote` no endereço do envio, nunca `refs/remotes` local) e do histórico até a `LINHA_DE_BASE` (`portao_regras.py`): blobs em claro únicos até 393216 bytes, amostra até 16384 e objetos commit e tag até 32768. A linha `[envio-orcamento]` mostra a conta.
 - CI: o portão da base soma tudo desde a `LINHA_DE_BASE` (sem ela no repositório, o histórico inteiro): blobs em claro únicos até 524288 bytes, amostra até 32768 e objetos commit e tag até 65536. A linha `[ci-orcamento]` mostra a conta e a base.
 - O que um envio fatiado dentro do teto, ou um envio pulando os ganchos, põe no remoto só o CI pega, e só depois de publicado.
 - Renovação: commit próprio que muda só a linha `LINHA_DE_BASE` para um commit já publicado e revisado, com aceite do líder, quando a linha `[ci-orcamento]` passar de 393216 bytes em claro. A base nova só vale a partir do envio seguinte ao da renovação. Renovar depois do estouro deixa vermelho o CI do próprio envio da renovação; o envio seguinte volta ao verde.
 - A renovação zera a conta. O acúmulo entre renovações só é limitado por ela ser um commit visível, julgado pelo portão anterior, com aceite do líder.
+- Leitura do CI na renovação: o verde do CI do envio seguinte à renovação não prova que o acúmulo acabou. O estouro fica registrado no vermelho do CI do envio que estourou e no do envio da renovação; o pedido de aceite da renovação cita os dois.
 
 ## Regras de travessão
 
@@ -124,7 +125,7 @@ O líder aceitou os riscos K1, K2 e K3 em 20/11/2026, às 03:42 (registro em `ca
 - **K1: arquivo de CI trocado no próprio envio.** O GitHub lê o workflow do commit enviado. Controles: envio feito da máquina com a chave, ganchos instalados, `--no-verify` proibido (L-25) e auditoria antes do envio.
 - **K2: portão trocado em envio anterior aceito.** Um envio troca o código do portão, e os seguintes são julgados pelo portão trocado. Controle: a sequência de dois passos descrita acima.
 - **K3: conteúdo codificado de propósito parece cifra.** Sem chave, um corpo de bytes aleatórios com cabeçalho falso pode passar pela heurística. Controle: a conferência completa com chave, no envio.
-- **Primeiro envio sem base de comparação (à parte das classes K1 a K3).** Sem `main` no remoto, o `pre-push` julga pelo HEAD. Controle: a verificação do SG-04, fora do repositório, sobre clone novo. O primeiro envio público só sai depois do SG-04 e de novo sim do líder (registro de 20/11/2026, 03:07, no mesmo arquivo).
+- **Primeiro envio sem base de comparação (à parte das classes K1 a K3).** Com o remoto vazio, o `pre-push` julga pelo HEAD. Controle: a verificação do SG-04, fora do repositório, sobre clone novo. O primeiro envio público só sai depois do SG-04 e de novo sim do líder (registro de 20/11/2026, 03:07, no mesmo arquivo).
 - **R5: texto em claro em caminho permitido.** Controle: a lista de caminhos em claro é fechada e só muda por commit visível no código do portão.
 - **R6: nomes e tamanhos de caminho visíveis.** Controle: nomes neutros, e a decisão de aceitar o tamanho tomada no SG-01.
 - **K4: texto curto que cabe na forma, em lugar público, dentro dos tetos.** Um trecho curto em arquivo de ferramenta, na amostra, em mensagem de commit ou de tag, inclusive enredo no assunto, passa pela forma e pelos tetos. Risco residual aceito pelo líder em 20/11/2026 (registro de decisões do projeto). Controles: os tetos acima, a conferência completa com chave no envio, a proibição de pular os ganchos (`--no-verify`, L-25) e a auditoria antes do primeiro envio.

@@ -19,8 +19,11 @@ Arquivos:
 
 - `montar.sh`: monta os dois formatos. Qualquer erro aborta com status diferente de zero.
 - `filtro-links.lua`: troca link entre capítulos (`arquivo.md` ou `arquivo.md#id`) por link interno. Link para capítulo fora da montagem, ou para id que não existe, aborta a montagem.
-- `estilo.css`: folha de estilo, com hifenização ativa no texto em português (`:lang(pt)`).
+- `estilo.css`: folha de estilo do HTML e do ePub. Texto justificado, recuo de 1,5em em cada parágrafo, sem espaço entre parágrafos, sem recuo no primeiro parágrafo depois de título e depois de quebra de cena. Hifenização ativa no texto em português (`:lang(pt)`).
+- `diagramacao.md`: especificação do PDF de gráfica (14x21 cm, margens espelhadas, trecho Typst). Não testado: o Typst ainda não está instalado.
 - `amostra/`: livro de amostra, sem obra real, usado para testar a montagem.
+
+Quebra de cena no texto: uma linha só com `* * *`. O Pandoc grava como `<hr />`, e o CSS tira o recuo do parágrafo que vem logo depois. Não use `---` para isso: com a extensão `smart` do Pandoc, traços podem virar travessão.
 
 Pré-requisitos: `pandoc` 3.x no PATH e `epubcheck` 5.4.0 (oficial do W3C) para conferir o ePub.
 

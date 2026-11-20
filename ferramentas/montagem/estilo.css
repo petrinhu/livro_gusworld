@@ -1,6 +1,13 @@
 /* estilo.css (TE-01): folha de estilo da montagem em HTML5 e ePub 3.
  * A hifenizacao depende do idioma: o Pandoc grava lang="pt-BR" (metadados.yaml),
- * e o seletor :lang(pt) abaixo so age sobre esse texto. */
+ * e o seletor :lang(pt) abaixo so age sobre esse texto.
+ *
+ * Diagramacao (decisao do lider, 19/11/2026): texto justificado, recuo de
+ * primeira linha de 1,5em em todo paragrafo, exceto o primeiro paragrafo depois
+ * de titulo (h1, h2) e depois de quebra de cena (hr). A quebra de cena vem da
+ * linha `* * *` no Markdown, que o Pandoc grava como <hr />.
+ * Sem espaco vertical entre paragrafos: o recuo marca o paragrafo.
+ * A diagramacao do PDF de grafica fica em ../diagramacao.md. */
 
 html {
   font-size: 100%;
@@ -16,7 +23,8 @@ body {
 }
 
 p {
-  margin: 0 0 0.9em 0;
+  margin: 0;
+  text-indent: 1.5em;
   orphans: 2;
   widows: 2;
   text-align: justify;
@@ -27,6 +35,19 @@ p {
 p:lang(pt) {
   hyphens: auto;
   -webkit-hyphens: auto;
+}
+
+/* Sem recuo no primeiro paragrafo depois de titulo e de quebra de cena. */
+h1 + p,
+h2 + p,
+hr + p {
+  text-indent: 0;
+}
+
+/* Metadados da capa do HTML e do ePub (autor, data) nao recuam. */
+p.author,
+p.date {
+  text-indent: 0;
 }
 
 h1 {

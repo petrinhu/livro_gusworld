@@ -4,27 +4,70 @@ import os
 from portao_cifra import e_excecao, falha_caminho, falha_teto, falhas_confianca, heuristica, modo_falha
 from portao_git import (ErroGit, arvore, cat_file_filtrado_bruto, conteudos, git, git_tenta, imprime,
                         pares_do_historico, separa_filtrado)
-from portao_regras import CABECALHO, NOREPLY, SESSAO, TAMANHO_CABECALHO
+from portao_mensagem import cita_sessao, falha_assunto, falhas_mensagem, tem_travessao
+from portao_regras import CABECALHO, MARCO, NOREPLY, TAMANHO_CABECALHO
+from portao_travessao import falha_travessao
 
 
 def eh_zero(sha):
     return not sha or set(sha) == {"0"}
 
 
-def verifica_commits(revs):
-    """Autor, committer e sessao de cada commit de revs (um processo git). Devolve (n, falhas)."""
-    falhas, n = [], 0
+def marco_existe():
+    """O MARCO existe neste repositorio? Sem ele (repositorio de teste), o formato vale para todo commit."""
+    return git_tenta(["cat-file", "-e", MARCO + "^{commit}"])[0] == 0
+
+
+def verifica_mensagens(revs, revs_formato):
+    """Autor, committer, sessao, comentario e travessao de cada commit de revs; formato do assunto so nos
+    commits de revs_formato (o historico ate o MARCO fica isento, D5). Dois processos git no total.
+
+    Devolve (n, falhas, n_formato, analisados_formato, falhas_formato).
+    """
+    falhas, falhas_fmt, n, analisados = [], [], 0, 0
     reg = git(["log", *revs, "--format=%H%x00%ae%x00%ce%x00%B%x1e"]).decode("utf-8")
+    formato = set(git(["rev-list", *revs_formato]).decode("ascii").split())
     for rec in reg.split("\x1e"):
         rec = rec.strip("\n")
         if not rec:
             continue
         n += 1
         h, ae, ce, corpo = rec.split("\x00", 3)
+        rotulo = f"commit {h[:7]}"
         if ae != NOREPLY or ce != NOREPLY:
-            falhas.append(f"commit {h[:7]}: autor ou committer fora do noreply")
-        if SESSAO.search(corpo):
-            falhas.append(f"commit {h[:7]}: cita sessao (Claude-Session)")
+            falhas.append(f"{rotulo}: autor ou committer fora do noreply")
+        falhas.extend(f"{rotulo}: {f}" for f in falhas_mensagem(corpo, formato=False, gravada=True))
+        if h in formato:
+            analisados += 1
+            falha = falha_assunto(corpo)
+            if falha:
+                falhas_fmt.append(f"{rotulo}: {falha}")
+    if analisados != len(formato):
+        falhas_fmt.append("contagem do formato diverge do historico (rev-list e log)")
+    return n, falhas, len(formato), analisados, falhas_fmt
+
+
+def verifica_tags(alvos):
+    """Tags anotadas: tagger noreply, mensagem sem sessao e sem travessao (SG-02, S52). Um processo git.
+
+    alvos: None julga todas (ci); conjunto de objetos enviados (envio). Devolve (n, falhas).
+    """
+    saida = git(["for-each-ref", "refs/tags", "--format=%(objecttype)%00%(refname)%00%(objectname)%00"
+                 "%(taggeremail)%00%(contents)%00"]).decode("utf-8")
+    campos = saida.split("\x00")  # registros de 5 campos, cada um terminado em NUL
+    n, falhas = 0, []
+    for i in range(0, len(campos) - 1, 5):
+        tipo, ref, objeto, mail, conteudo = campos[i:i + 5]
+        if tipo != "tag" or (alvos is not None and objeto not in alvos):
+            continue
+        n += 1
+        nome = ref.removeprefix("refs/tags/")
+        if mail.strip("<>") != NOREPLY:
+            falhas.append(f"tag {nome}: tagger fora do noreply")
+        if cita_sessao(conteudo):
+            falhas.append(f"tag {nome}: cita sessao (Claude-Session)")
+        if tem_travessao(conteudo):
+            falhas.append(f"tag {nome}: travessao na mensagem")
     return n, falhas
 
 
@@ -46,8 +89,17 @@ def refs_e_raso():
     return len(refs), falhas
 
 
+def falha_texto_claro(caminho, corpo):
+    """Blob em claro de excecao: UTF-8 e travessao, a mesma regra do pre-commit (SG-02, S40)."""
+    try:
+        texto = corpo.decode("utf-8")
+    except UnicodeDecodeError:
+        return f"nao e UTF-8, nao analisado: {caminho}"
+    return falha_travessao(caminho, texto)
+
+
 def confere_pares(pares):
-    """Modo, cabecalho, classificacao e teto de cada par (hash, caminho, modo), sem chave.
+    """Modo, cabecalho, classificacao, teto e (em claro, na excecao) travessao de cada par (hash, caminho, modo).
 
     Modo proibido vira falha antes da leitura do conteudo (submodulo nao tem blob no clone).
     Devolve (analisados, falhas, cifrados, corpos): cifrados = pares cifrados fora da excecao.
@@ -67,6 +119,8 @@ def confere_pares(pares):
         falha = falha_caminho(caminho, cifrado, rotulo=f"blob {sha[:7]} ")
         if falha is None and cifrado:
             falha = falha_teto(caminho, len(corpos[sha]) - TAMANHO_CABECALHO)
+        if falha is None and not cifrado and e_excecao(caminho):
+            falha = falha_texto_claro(caminho, corpos[sha])
         if falha is None:
             analisados += 1
         else:
@@ -82,8 +136,10 @@ def ci():
         return False
     n_ref, falhas_ref = refs_e_raso()
     ok_refs = imprime("ci-refs", n_ref, n_ref, falhas_ref)
-    n, falhas_commit = verifica_commits(["--all"])
+    formato = ["--all", "--not", MARCO] if marco_existe() else ["--all"]
+    n, falhas_commit, n_fmt, vistos, falhas_fmt = verifica_mensagens(["--all"], formato)
     ok_commits = imprime("ci-commits", n, n, falhas_commit)
+    ok_assuntos = imprime("ci-assuntos", n_fmt, vistos, falhas_fmt, vazia_ok=True)
     pares = pares_do_historico(["--all"])
     analisados, falhas_blob, _cifrados, corpos = confere_pares(pares)
     ok_blobs = imprime("ci-blobs", len(pares), analisados, falhas_blob)
@@ -97,7 +153,9 @@ def ci():
         print(f"  FALHOU {f}")
     n_conf, falhas_conf = falhas_confianca(arvore("HEAD"))
     ok_conf = imprime("ci-confianca", n_conf, n_conf - len(falhas_conf), falhas_conf)
-    return ok_refs and ok_commits and ok_blobs and not falhas_heu and ok_conf
+    n_tag, falhas_tag = verifica_tags(None)
+    ok_tags = imprime("ci-tags", n_tag, n_tag, falhas_tag, vazia_ok=True)
+    return all([ok_refs, ok_commits, ok_assuntos, ok_blobs, not falhas_heu, ok_conf, ok_tags])
 
 
 def revs_da_entrada(texto):
@@ -148,8 +206,12 @@ def envio(texto):
     n_ref, falhas_ref = refs_e_raso()
     ok_refs = imprime("envio-refs", n_ref, n_ref, falhas_ref)
     revs = locais + (["--not", *remotos] if remotos else [])
-    n, falhas_commit = verifica_commits(revs) if locais else (0, [])
+    n, falhas_commit, n_fmt, vistos, falhas_fmt = 0, [], 0, 0, []
+    if locais:
+        formato = (locais + ["--not", *remotos, MARCO]) if marco_existe() else revs
+        n, falhas_commit, n_fmt, vistos, falhas_fmt = verifica_mensagens(revs, formato)
     ok_commits = imprime("envio-commits", n, n, falhas_commit, vazia_ok=True)
+    ok_assuntos = imprime("envio-assuntos", n_fmt, vistos, falhas_fmt, vazia_ok=True)
     pares = pares_do_historico(revs) if locais else set()
     analisados, falhas_blob, cifrados, _corpos = confere_pares(pares)
     ok_blobs = imprime("envio-blobs", len(pares), analisados, falhas_blob, vazia_ok=True)
@@ -158,5 +220,7 @@ def envio(texto):
         da_arvore.update(arvore(ponta))
     n_conf, falhas_conf = falhas_confianca(sorted(da_arvore))
     ok_conf = imprime("envio-confianca", n_conf, n_conf - len(falhas_conf), falhas_conf, vazia_ok=True)
+    n_tag, falhas_tag = verifica_tags(set(locais))
+    ok_tags = imprime("envio-tags", n_tag, n_tag, falhas_tag, vazia_ok=True)
     ok_chave = envio_chave(cifrados)
-    return ok_refs and ok_commits and ok_blobs and ok_conf and ok_chave
+    return all([ok_refs, ok_commits, ok_assuntos, ok_blobs, ok_conf, ok_tags, ok_chave])

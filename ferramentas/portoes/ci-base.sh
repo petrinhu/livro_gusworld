@@ -13,4 +13,8 @@ for nome in ci-commits ci-blobs ci-confianca; do
 done
 grep -q "^\[ci-heuristica\] cifrados=[1-9]" "$D/saida.txt" || {
     echo "  FALHOU saida do portao sem linha de heuristica: ci-heuristica"; falhou=1; }
+for nome in ci-assuntos ci-tags; do
+    grep -q "^\[$nome\] encontrados=[0-9]" "$D/saida.txt" || {
+        echo "  FALHOU saida do portao sem linha de contagem: $nome"; falhou=1; }
+done
 exit "$falhou"

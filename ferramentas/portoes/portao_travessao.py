@@ -19,6 +19,12 @@ def travessao_fora_de_lugar(texto, fala_permitida):
     return 0
 
 
+def falha_travessao(caminho, texto):
+    """Falha de travessao fora de inicio de fala num texto decifrado ou em claro, ou None (SG-02, S40)."""
+    n = travessao_fora_de_lugar(texto, bool(FALA.match(caminho)))
+    return f"travessao fora de inicio de fala, linha {n}: {caminho}" if n else None
+
+
 def portao_travessao(itens):
     falhas, analisados = [], 0
     alvo = []
@@ -45,8 +51,9 @@ def portao_travessao(itens):
         except UnicodeDecodeError:
             falhas.append(f"nao e UTF-8, nao analisado: {caminho}")
             continue
-        analisados += 1
-        n = travessao_fora_de_lugar(texto, bool(FALA.match(caminho)))
-        if n:
-            falhas.append(f"travessao fora de inicio de fala, linha {n}: {caminho}")
+        falha = falha_travessao(caminho, texto)
+        if falha:
+            falhas.append(falha)
+        else:
+            analisados += 1
     return analisados, falhas

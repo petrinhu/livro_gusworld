@@ -4,14 +4,23 @@ import re
 NOREPLY = "238845971+petrinhu@users.noreply.github.com"
 CABECALHO = b"\x00GITCRYPT\x00"
 TRAVESSOES = ("\u2014", "\u2013")
+# Mensagem de commit e de tag: traco parecido com o travessao tambem conta (L-01 do projeto, emendada em
+# 20/11/2026). O sinal de menos (U+2212) fica fora. Os blobs seguem TRAVESSOES ate a Fase 7 (OS 6.7).
+TRAVESSOES_MENSAGEM = frozenset(("\u2014", "\u2013", "\u2015", "\u2012", "\u2e3a", "\u2e3b", "\ufe58",
+                                 "\ufe31", "\ufe32"))
 FALA = re.compile(r"^(livro-[^/]+/texto/|ferramentas/montagem/amostra/texto/)")
 TIPOS = "feat|fix|refactor|chore|docs|test|perf|style|revert"
-ASSUNTO = re.compile(
-    r"^(?:%s)(?:\([^()\n]+\))?!?: \S.* \((?:[A-Z][A-Z0-9]{0,7}-[A-Za-z0-9]{1,8}|F[0-9]+\.[0-9]+)\)$"
-    % TIPOS
-)
+# Lista fechada de prefixos de ID (SG-02, D5): de 1 a 6 IDs separados por ", ".
+ID = (r"(?:(?:FU|AUD|PQ|CO|CA|AR|SG|TE|TST|SI|LO|LA|RG|TR|TL|WK|L[1-3]|E[1-3])-"
+      r"(?:[0-9]{2}|TEC[0-9]|W[0-9]{1,2}a?|FX|EX|RV|XX)|F[0-9]+\.[0-9]+)")
+ASSUNTO = re.compile(r"(?:%s)(?:\([^()\n]+\))?!?: \S.* \(%s(?:, %s){0,5}\)" % (TIPOS, ID, ID))
 ASSUNTO_MAX = 72
-SESSAO = re.compile(r"claude-session", re.IGNORECASE)
+# Sessao: a mensagem e normalizada antes (NFKC, sem caractere de formato Cf, casefold), ver portao_mensagem.
+SESSAO = (re.compile(r"claude[\W_]*session"), re.compile(r"claude\.ai"), re.compile(r"session_[0-9a-z]{6,}"))
+# Linha-tesoura que o git coloca com --cleanup=scissors / commit -v: o gancho local julga so o que vem antes.
+TESOURA = re.compile(r"^# -+ >8 -+$", re.MULTILINE)
+# Ultimo commit antes desta OS (SG-02): o formato do assunto nao vale para o historico ate ele (D5, sem reescrita).
+MARCO = "6b98df7fd4eb2be6493bbf214c8a995748b34272"
 FILTRO_EXIGIDO = (
     ("filter.git-crypt.clean", None),
     ("filter.git-crypt.smudge", None),

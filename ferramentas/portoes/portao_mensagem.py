@@ -1,8 +1,27 @@
-"""Portao de mensagem e autor (SG-02): assunto, ID, sessao, comentario no editor e identidade noreply."""
+"""Portao de mensagem e autor (SG-02): assunto, ID, sessao, travessao, comentario no inicio e identidade noreply.
+
+Uma funcao so de falhas (falhas_mensagem), usada pelo gancho local (texto acima da tesoura), pelo ci e pelo
+envio (mensagem gravada inteira, sem corte).
+"""
+import html.entities
 import re
+import unicodedata
 
 from portao_git import git_tenta, imprime
-from portao_regras import ASSUNTO, ASSUNTO_MAX, NOREPLY, SESSAO
+from portao_regras import ASSUNTO, ASSUNTO_MAX, NOREPLY, SESSAO, TESOURA, TRAVESSOES_MENSAGEM
+
+MENSAGEM_ASSUNTO = "assunto fora de 'tipo(escopo)?: descricao (ID)' ou com mais de 72 caracteres"
+MENSAGEM_SESSAO_LOCAL = "linha de sessao (Claude-Session) proibida na mensagem"
+MENSAGEM_SESSAO_GRAVADA = "cita sessao (Claude-Session)"  # texto antigo, que os testes do ci e do envio usam
+MENSAGEM_TRAVESSAO = "travessao na mensagem"
+MENSAGEM_COMENTARIO = "mensagem comeca com linha de comentario"
+
+# Codigos de travessao de mensagem e entidades que os nomeiam: a tabela HTML5 da biblioteca padrao.
+_CODIGOS = frozenset(ord(c) for c in TRAVESSOES_MENSAGEM)
+_NOMES = sorted((k[:-1] for k, v in html.entities.html5.items()
+                 if k.endswith(";") and len(v) == 1 and ord(v) in _CODIGOS), key=len, reverse=True)
+_ENTIDADE = re.compile(r"&(?:%s);|&#(?:[xX](?P<hex>[0-9a-fA-F]+)|(?P<dec>[0-9]+));"
+                       % "|".join(re.escape(n) for n in _NOMES))
 
 
 def portao_autor():
@@ -17,21 +36,67 @@ def portao_autor():
     return analisados, falhas
 
 
-def assunto_e_corpo(texto):
-    """Assunto e corpo, ignorando as linhas de comentario que o git coloca no editor."""
-    linhas = [ln for ln in texto.split("\n") if not ln.startswith("#")]
-    assunto = next((ln for ln in linhas if ln.strip()), "")
-    return assunto, "\n".join(linhas)
+def normaliza_sessao(texto):
+    """NFKC, sem caractere de formato (Cf, como largura zero), em caixa baixa: a forma que a sessao casa."""
+    t = unicodedata.normalize("NFKC", texto)
+    return "".join(c for c in t if unicodedata.category(c) != "Cf").casefold()
 
 
-def falhas_mensagem(texto):
-    """Falhas da mensagem, sem devolver o texto dela (V11)."""
-    assunto, corpo = assunto_e_corpo(texto)
+def cita_sessao(texto):
+    n = normaliza_sessao(texto)
+    return any(r.search(n) for r in SESSAO)
+
+
+def tem_travessao(texto):
+    """Travessao de mensagem: caractere da lista fechada ou entidade que o nomeia (checa a forma NFKC)."""
+    t = unicodedata.normalize("NFKC", texto)
+    if any(c in TRAVESSOES_MENSAGEM for c in t):
+        return True
+    for m in _ENTIDADE.finditer(t):
+        if m.group("hex") is None and m.group("dec") is None:
+            return True
+        cod = int(m.group("hex"), 16) if m.group("hex") is not None else int(m.group("dec"))
+        if cod in _CODIGOS:
+            return True
+    return False
+
+
+def primeira_linha(texto):
+    """Primeira linha nao vazia, sem espaco final (o git limpa o espaco final, e o gancho julga isso)."""
+    return next((ln for ln in texto.split("\n") if ln.strip()), "").rstrip()
+
+
+def assunto_ok(linha):
+    return ASSUNTO.fullmatch(linha) is not None and len(linha) <= ASSUNTO_MAX
+
+
+def falha_assunto(texto):
+    """Falha do formato do assunto (so o assunto, nao o corpo), ou None."""
+    return None if assunto_ok(primeira_linha(texto)) else MENSAGEM_ASSUNTO
+
+
+def acima_da_tesoura(texto):
+    """Texto antes da linha-tesoura do git. Sem tesoura, o texto inteiro."""
+    m = TESOURA.search(texto)
+    return texto[:m.start()] if m else texto
+
+
+def falhas_mensagem(texto, formato, gravada=False):
+    """Falhas da mensagem, sem devolver o texto dela (V11).
+
+    formato=False isenta so o formato do assunto (historico ate o MARCO, D5); o resto vale sempre.
+    gravada=True: a mensagem ja esta no historico (ci e envio), e a sessao usa o texto gravado.
+    """
+    linha = primeira_linha(texto)
     falhas = []
-    if not (ASSUNTO.match(assunto) and len(assunto) <= ASSUNTO_MAX):
-        falhas.append("assunto fora de 'tipo(escopo)?: descricao (ID)' ou com mais de 72 caracteres")
-    if SESSAO.search(corpo):
-        falhas.append("linha de sessao (Claude-Session) proibida na mensagem")
+    if linha.startswith("#"):
+        falhas.append(MENSAGEM_COMENTARIO)
+    if formato and not assunto_ok(linha):
+        falhas.append(MENSAGEM_ASSUNTO)
+    if cita_sessao(texto):
+        falhas.append(MENSAGEM_SESSAO_GRAVADA if gravada else MENSAGEM_SESSAO_LOCAL)
+    if tem_travessao(texto):
+        falhas.append(MENSAGEM_TRAVESSAO)
     return falhas
 
 
@@ -42,13 +107,13 @@ def commit_msg(caminho):
         texto = bruto.decode("utf-8")
     except UnicodeDecodeError:
         return imprime("commit-msg", 1, 0, ["mensagem nao e UTF-8"])
-    return imprime("commit-msg", 1, 1, falhas_mensagem(texto))
+    return imprime("commit-msg", 1, 1, falhas_mensagem(acima_da_tesoura(texto), formato=True))
 
 
 def assuntos(linhas):
     pendentes = [ln.rstrip("\n") for ln in linhas if ln.strip()]
     falhas = []
     for n, ln in enumerate(pendentes, start=1):
-        if not (ASSUNTO.match(ln) and len(ln) <= ASSUNTO_MAX):
+        if not assunto_ok(ln):
             falhas.append(f"assunto fora do formato, linha {n} do lote")
     return imprime("assuntos", len(pendentes), len(pendentes), falhas)
